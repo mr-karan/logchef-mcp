@@ -1,32 +1,37 @@
 # Logchef MCP Server
 
-A [Model Context Protocol][mcp] (MCP) server for Logchef.
+A [Model Context Protocol][mcp] (MCP) server that connects AI assistants to your [Logchef](https://logchef.app) instance.
 
-This provides access to your Logchef instance for querying logs, managing teams, and exploring log data through natural language interactions.
+Logchef is a powerful log management platform that stores logs in ClickHouse, providing fast querying and analysis capabilities. This MCP server enables AI assistants to interact with your Logchef deployment, making log analysis and troubleshooting more accessible through natural conversation.
 
-## Features
+## What You Can Do
 
-_The following features are currently available in the MCP server. This list is for informational purposes only and does not represent a roadmap or commitment to future features._
+With this MCP server, you can ask AI assistants to help you:
 
-### Profile Management
-- **Get user profile:** Retrieve current user profile information including user details and API token information
-- **Get teams:** List all teams that the authenticated user belongs to, including their role in each team and member count
-- **Get server metadata:** Retrieve server version and configuration information
+- **Explore your log infrastructure:** See what teams you belong to and what log sources are available
+- **Query logs effectively:** Execute ClickHouse SQL queries to find specific log entries, errors, or patterns
+- **Understand your data:** Get schema information to know what fields are available in your logs
+- **Analyze log patterns:** Generate histograms and time-series data for trend analysis
+- **Manage saved queries:** Create and organize collections of frequently-used queries
+- **Administer teams and users:** Handle team membership, user management, and source configuration (admin users)
 
-### Source Management
-- **Get user sources:** List all log sources accessible to the user across all their team memberships
-- **Get team sources:** List log sources for a specific team
-- **Get source schema:** Retrieve ClickHouse table schema (column names and types) for a specific source
+## Tool Categories
 
-### Log Querying
-- **Query logs:** Execute ClickHouse SQL queries against log sources to retrieve structured log data
-- **Natural language to SQL:** Ask questions in natural language and get help constructing efficient ClickHouse queries
-- **Schema exploration:** Understand available fields and data types before querying
+The server provides tools organized into logical categories that can be enabled or disabled as needed:
 
-The list of tools is configurable, so you can choose which tools you want to make available to the MCP client.
-This is useful if you don't use certain functionality or if you don't want to take up too much of the context window.
-To disable a category of tools, use the `--disable-<category>` flag when starting the server. For example, to disable
-the logs tools, use `--disable-logs`.
+### Profile & Metadata
+Core user and server information including team memberships and server version details.
+
+### Source Management  
+Access to log sources across your teams, including schema exploration and source listing.
+
+### Log Analysis
+The core querying capabilities including SQL execution, histogram generation, and saved query management.
+
+### Administration
+Team management, user administration, source configuration, and API token management (requires admin privileges).
+
+Use the `--disable-<category>` flag to turn off tool categories you don't need. For example, `--disable-admin` removes all administrative tools.
 
 ### Tools
 
@@ -69,12 +74,24 @@ the logs tools, use `--disable-logs`.
 | `delete_source`                | Admin    | Delete a log source (admin only)                                                                    |
 | `get_admin_source_stats`       | Admin    | Get detailed statistics for a log source (admin only)                                               |
 
-## Usage
+## Getting Started
 
-1. Generate an API token in Logchef and copy it for use in the configuration.
-   Follow your Logchef instance documentation for details on creating API tokens.
+### Prerequisites
 
-2. You have several options to install `logchef-mcp`:
+You'll need:
+- A running Logchef instance ([learn more at logchef.app](https://logchef.app))
+- A valid Logchef API token with appropriate permissions
+
+### Generating an API Token
+
+1. Log into your Logchef instance
+2. Navigate to your profile settings
+3. Create a new API token with the permissions you need
+4. Copy the token for use in the MCP server configuration
+
+### Installation
+
+Choose one of the following installation methods:
 
    - **Docker image**: Use the pre-built Docker image.
 
@@ -262,83 +279,109 @@ Example with selective tool enabling:
 }
 ```
 
-## Log Querying Workflow
+## Working with Logchef Through AI
 
-The MCP server enables natural language log querying through this workflow:
+This MCP server enables you to interact with your Logchef logs through natural conversation with AI assistants. Here's how it typically works:
 
-1. **Explore Sources**: Use `get_sources` or `get_team_sources` to see available log sources
-2. **Get Schema**: Use `get_source_schema` to understand the ClickHouse table structure
-3. **Query Logs**: Use `query_logs` with raw SQL to retrieve log entries
+### Discovery Workflow
+1. **"What log sources do I have access to?"** → The AI uses `get_sources` to show your available sources
+2. **"What data is in the nginx source?"** → The AI calls `get_source_schema` to explain the log structure
+3. **"Show me recent errors"** → The AI constructs and executes a ClickHouse query using `query_logs`
 
-Example interaction:
-- "Show me all available sources" → `get_sources`
-- "What fields are available in source 2?" → `get_source_schema` 
-- "Get the last 50 error logs from today" → `query_logs` with appropriate ClickHouse SQL
+### Practical Examples
+- **Troubleshooting**: "Find all 500 errors in the last hour from the web service logs"
+- **Analysis**: "Show me a histogram of log volume over the past day"
+- **Investigation**: "What are the most common error messages in the database logs?"
+- **Monitoring**: "Create a saved query for tracking API response times"
 
-The AI assistant can help construct efficient ClickHouse queries based on the schema and your natural language requests.
+### AI-Assisted Query Building
+The AI assistant understands ClickHouse SQL and can help you:
+- Build complex queries with proper syntax
+- Optimize queries for better performance  
+- Explain what fields are available in your log data
+- Suggest useful queries based on common log analysis patterns
+
+Since Logchef uses ClickHouse as the storage backend, you get the full power of ClickHouse's analytical capabilities through natural language interaction.
 
 ## Development
 
-Contributions are welcome! Please open an issue or submit a pull request if you have any suggestions or improvements.
+This project is written in Go and uses [Just](https://github.com/casey/just) as a command runner for common development tasks.
 
-This project is written in Go. Install Go following the instructions for your platform.
+### Prerequisites
+- Go 1.21 or later
+- A running Logchef instance for testing
+- Valid Logchef API credentials
 
-To run the server locally in STDIO mode (which is the default for local development), use:
+### Quick Start
 
 ```bash
+# Install dependencies
+just deps
+
+# Run in STDIO mode (default for development)
 just run
-```
 
-Or manually:
-
-```bash
-go run ./cmd/logchef-mcp
-```
-
-To run the server locally in SSE mode, use:
-
-```bash
+# Run in SSE mode for web-based clients
 just run-sse
+
+# Build the binary
+just build
+
+# Run tests
+just test
 ```
 
-Or manually:
+### Environment Variables
+
+For development, set these environment variables:
 
 ```bash
-go run ./cmd/logchef-mcp --transport sse
+export LOGCHEF_URL=http://localhost:5173  # Your Logchef instance URL
+export LOGCHEF_API_KEY=your_api_token_here
 ```
 
-You can also run the server using the SSE transport inside a custom built Docker image. Just like the published Docker image, this custom image's entrypoint defaults to SSE mode. To build the image, use:
+### Docker Development
+
+Build and test the Docker image locally:
 
 ```bash
+# Build development image
 just build-image
-```
 
-And to run the image in SSE mode (the default), use:
+# Test GoReleaser Docker setup
+just build-goreleaser-image
 
-```bash
+# Run in different modes
+just docker-run-stdio
 just docker-run-sse
 ```
 
-If you need to run it in STDIO mode instead, use:
+### Testing & Verification
+
+Test the server with your Logchef instance:
 
 ```bash
-just docker-run-stdio
-```
-
-### Testing
-
-To test the server, you can build and run it with a local Logchef instance:
-
-```bash
+# Build and run with your credentials
 just build
-LOGCHEF_URL=http://localhost:5173 LOGCHEF_API_KEY=your_token ./dist/logchef-mcp.bin
-```
+LOGCHEF_URL=http://localhost:5173 LOGCHEF_API_KEY=your_token ./dist/logchef-mcp
 
-You can also check the version:
-
-```bash
+# Check version info
 just show-version
+
+# Test basic functionality
+just help
 ```
+
+### Contributing
+
+Contributions are welcome! When adding new tools or features:
+
+1. Follow the existing patterns for tool definition and client methods
+2. Add appropriate error handling and validation
+3. Update the tools table in this README
+4. Test with a real Logchef instance
+
+Please open an issue to discuss larger changes before implementing them.
 
 ## License
 
