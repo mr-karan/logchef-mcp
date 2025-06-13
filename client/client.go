@@ -122,19 +122,8 @@ type LogQueryRequest struct {
 	QueryTimeout *int   `json:"query_timeout,omitempty"`
 }
 
-// LogEntry represents a single log entry
-type LogEntry struct {
-	Body           string                 `json:"body"`
-	LogAttributes  map[string]interface{} `json:"log_attributes"`
-	Namespace      string                 `json:"namespace"`
-	ServiceName    string                 `json:"service_name"`
-	SeverityNumber int                    `json:"severity_number"`
-	SeverityText   string                 `json:"severity_text"`
-	SpanID         string                 `json:"span_id"`
-	Timestamp      string                 `json:"timestamp"`
-	TraceFlags     int                    `json:"trace_flags"`
-	TraceID        string                 `json:"trace_id"`
-}
+// LogEntry represents a single log entry with flexible schema
+type LogEntry map[string]interface{}
 
 // LogQueryStats represents the execution statistics for a log query
 type LogQueryStats struct {

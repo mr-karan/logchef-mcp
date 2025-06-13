@@ -198,6 +198,32 @@ If you're using VSCode and running the MCP server in SSE mode (which is the defa
 }
 ```
 
+**Using HTTP Headers for Authentication**
+
+When running the MCP server in SSE or streamable-http mode, you can pass Logchef credentials via HTTP headers instead of environment variables. This is useful when the server needs to handle multiple clients with different Logchef instances or API keys.
+
+The server recognizes these headers:
+- `X-Logchef-URL`: The Logchef instance URL  
+- `X-Logchef-API-Key`: The API token for authentication
+
+Example configuration for clients that support custom headers:
+
+```json
+{
+  "mcpServers": {
+    "logchef": {
+      "url": "http://localhost:8000",
+      "headers": {
+        "X-Logchef-URL": "https://your-logchef-instance.com",
+        "X-Logchef-API-Key": "your_api_token_here"
+      }
+    }
+  }
+}
+```
+
+If headers are not provided, the server will fall back to environment variables (`LOGCHEF_URL` and `LOGCHEF_API_KEY`).
+
 ### Debug Mode
 
 You can enable debug mode for the Logchef transport by adding the `-debug` flag to the command. This will provide detailed logging of HTTP requests and responses between the MCP server and the Logchef API, which can be helpful for troubleshooting.
