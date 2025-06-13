@@ -1,0 +1,25 @@
+FROM debian:bullseye-slim
+
+# Install ca-certificates for HTTPS requests
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+
+# Create a non-root user
+RUN useradd -r -u 1000 -m logchef-mcp
+
+# Set the working directory
+WORKDIR /app
+
+# Copy the pre-built binary from GoReleaser
+COPY logchef-mcp /app/logchef-mcp
+
+# Make binary executable and set ownership
+RUN chmod +x /app/logchef-mcp && chown logchef-mcp:logchef-mcp /app/logchef-mcp
+
+# Use the non-root user
+USER logchef-mcp
+
+# Expose the port the app runs on
+EXPOSE 8000
+
+# Run the application - default to SSE mode for Docker
+ENTRYPOINT ["/app/logchef-mcp", "--transport", "sse", "--address", "0.0.0.0:8000"]
