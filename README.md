@@ -185,8 +185,25 @@ Choose one of the following installation methods:
 
 **Using VSCode with remote MCP server**
 
-If you're using VSCode and running the MCP server in SSE mode (which is the default when using the Docker image without overriding the transport), make sure your `.vscode/settings.json` includes the following:
+If you're using VSCode and running the MCP server remotely, you can configure it to connect via HTTP or SSE transport. Make sure your `.vscode/settings.json` includes the following:
 
+For HTTP transport (recommended):
+```json
+"mcp": {
+  "servers": {
+    "logchef": {
+      "type": "http",
+      "url": "http://localhost:8000/mcp",
+      "headers": {
+        "X-Logchef-URL": "https://your-logchef-instance.com",
+        "X-Logchef-API-Key": "your_api_token_here"
+      }
+    }
+  }
+}
+```
+
+For SSE transport:
 ```json
 "mcp": {
   "servers": {
@@ -212,7 +229,8 @@ Example configuration for clients that support custom headers:
 {
   "mcpServers": {
     "logchef": {
-      "url": "http://localhost:8000",
+      "type": "http",
+      "url": "http://localhost:8000/mcp",
       "headers": {
         "X-Logchef-URL": "https://your-logchef-instance.com",
         "X-Logchef-API-Key": "your_api_token_here"
