@@ -100,22 +100,22 @@ Choose one of the following installation methods:
      1. **STDIO Mode**: For stdio mode you must explicitly override the default with `-t stdio` and include the `-i` flag to keep stdin open:
 
      ```bash
-     docker pull logchef-mcp
-     docker run --rm -i -e LOGCHEF_URL=http://localhost:5173 -e LOGCHEF_API_KEY=<your_api_token> logchef-mcp -t stdio
+     docker pull ghcr.io/mr-karan/logchef-mcp:latest
+     docker run --rm -i -e LOGCHEF_URL=http://localhost:5173 -e LOGCHEF_API_KEY=<your_api_token> ghcr.io/mr-karan/logchef-mcp:latest -t stdio
      ```
 
      2. **SSE Mode**: In this mode, the server runs as an HTTP server that clients connect to. You must expose port 8000 using the `-p` flag:
 
      ```bash
-     docker pull logchef-mcp
-     docker run --rm -p 8000:8000 -e LOGCHEF_URL=http://localhost:5173 -e LOGCHEF_API_KEY=<your_api_token> logchef-mcp
+     docker pull ghcr.io/mr-karan/logchef-mcp:latest
+     docker run --rm -p 8000:8000 -e LOGCHEF_URL=http://localhost:5173 -e LOGCHEF_API_KEY=<your_api_token> ghcr.io/mr-karan/logchef-mcp:latest
      ```
      
      3. **Streamable HTTP Mode**: In this mode, the server operates as an independent process that can handle multiple client connections. You must expose port 8000 using the `-p` flag:
 
      ```bash
-     docker pull logchef-mcp
-     docker run --rm -p 8000:8000 -e LOGCHEF_URL=http://localhost:5173 -e LOGCHEF_API_KEY=<your_api_token> logchef-mcp -t streamable-http
+     docker pull ghcr.io/mr-karan/logchef-mcp:latest
+     docker run --rm -p 8000:8000 -e LOGCHEF_URL=http://localhost:5173 -e LOGCHEF_API_KEY=<your_api_token> ghcr.io/mr-karan/logchef-mcp:latest -t streamable-http
      ```
 
    - **Download binary**: Download the latest release of `logchef-mcp` from the releases page and place it in your `$PATH`.
@@ -168,7 +168,7 @@ Choose one of the following installation methods:
            "LOGCHEF_URL",
            "-e",
            "LOGCHEF_API_KEY",
-           "logchef-mcp",
+           "ghcr.io/mr-karan/logchef-mcp:latest",
            "-t",
            "stdio"
          ],
@@ -280,7 +280,7 @@ To use debug mode with the Claude Desktop configuration, update your config as f
         "LOGCHEF_URL",
         "-e",
         "LOGCHEF_API_KEY",
-        "logchef-mcp",
+        "ghcr.io/mr-karan/logchef-mcp:latest",
         "-t",
         "stdio",
         "-debug"
