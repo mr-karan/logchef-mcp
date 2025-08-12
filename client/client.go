@@ -141,9 +141,10 @@ type LogColumn struct {
 type LogQueryResponse struct {
 	Status string `json:"status"`
 	Data   struct {
-		Logs    []LogEntry      `json:"logs"`
-		Stats   LogQueryStats   `json:"stats"`
-		Columns []LogColumn     `json:"columns"`
+		Data    []LogEntry    `json:"data"`
+		Stats   LogQueryStats `json:"stats"`
+		Columns []LogColumn   `json:"columns"`
+		QueryID string        `json:"query_id"`
 	} `json:"data"`
 }
 
