@@ -1741,3 +1741,255 @@ func (c *Client) GetAdminSourceStats(ctx context.Context, sourceID int) (*Source
 	return &stats, nil
 }
 
+
+// --- LogchefQL ---
+
+type LogchefQLQueryRequest struct {
+	Query        string `json:"query"`
+	Limit        int    `json:"limit,omitempty"`
+	StartTime    string `json:"start_time"`
+	EndTime      string `json:"end_time"`
+	Timezone     string `json:"timezone,omitempty"`
+	QueryTimeout *int   `json:"query_timeout,omitempty"`
+}
+
+type LogchefQLQueryResponse struct {
+	Status string `json:"status"`
+	Data   struct {
+		Logs         []LogEntry  `json:"logs"`
+		Columns      []LogColumn `json:"columns"`
+		Stats        LogQueryStats  `json:"stats"`
+		QueryID      string      `json:"query_id"`
+		GeneratedSQL string      `json:"generated_sql"`
+	} `json:"data"`
+}
+
+type LogchefQLTranslateRequest struct {
+	Query     string `json:"query"`
+	StartTime string `json:"start_time"`
+	EndTime   string `json:"end_time"`
+	Timezone  string `json:"timezone,omitempty"`
+	Limit     int    `json:"limit,omitempty"`
+}
+
+type LogchefQLTranslateResponse struct {
+	Status string `json:"status"`
+	Data   struct {
+		SQL   string `json:"sql"`
+		Valid bool   `json:"valid"`
+	} `json:"data"`
+}
+
+func (c *Client) QueryLogchefQL(ctx context.Context, teamID, sourceID int, req LogchefQLQueryRequest) (*LogchefQLQueryResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/teams/%d/sources/%d/logchefql/query", c.config.BaseURL, teamID, sourceID)
+	body, _ := json.Marshal(req)
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.config.APIKey))
+	httpReq.Header.Set("Content-Type", "application/json")
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(respBody))
+	}
+	var result LogchefQLQueryResponse
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (c *Client) TranslateLogchefQL(ctx context.Context, teamID, sourceID int, req LogchefQLTranslateRequest) (*LogchefQLTranslateResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/teams/%d/sources/%d/logchefql/translate", c.config.BaseURL, teamID, sourceID)
+	body, _ := json.Marshal(req)
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.config.APIKey))
+	httpReq.Header.Set("Content-Type", "application/json")
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(respBody))
+	}
+	var result LogchefQLTranslateResponse
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// --- Field Values ---
+
+type FieldValuesResponse struct {
+	Status string `json:"status"`
+	Data   struct {
+		Values []FieldValue `json:"values"`
+		Total  int          `json:"total"`
+	} `json:"data"`
+}
+
+type FieldValue struct {
+	Value string `json:"value"`
+	Count int    `json:"count"`
+}
+
+func (c *Client) GetFieldValues(ctx context.Context, teamID, sourceID int, fieldName, fieldType, startTime, endTime string, limit int) (*FieldValuesResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/teams/%d/sources/%d/fields/%s/values?type=%s&start_time=%s&end_time=%s&limit=%d",
+		c.config.BaseURL, teamID, sourceID, fieldName, fieldType, startTime, endTime, limit)
+	httpReq, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.config.APIKey))
+	httpReq.Header.Set("Content-Type", "application/json")
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(respBody))
+	}
+	var result FieldValuesResponse
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// --- Log Context ---
+
+type LogContextRequest struct {
+	Timestamp   int64 `json:"timestamp"`
+	BeforeLimit int   `json:"before_limit"`
+	AfterLimit  int   `json:"after_limit"`
+}
+
+type LogContextResponse struct {
+	Status string `json:"status"`
+	Data   struct {
+		TargetTimestamp int64      `json:"target_timestamp"`
+		BeforeLogs      []LogEntry `json:"before_logs"`
+		TargetLogs      []LogEntry `json:"target_logs"`
+		AfterLogs       []LogEntry `json:"after_logs"`
+		Stats           LogQueryStats `json:"stats"`
+	} `json:"data"`
+}
+
+func (c *Client) GetLogContext(ctx context.Context, teamID, sourceID int, req LogContextRequest) (*LogContextResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/teams/%d/sources/%d/logs/context", c.config.BaseURL, teamID, sourceID)
+	body, _ := json.Marshal(req)
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.config.APIKey))
+	httpReq.Header.Set("Content-Type", "application/json")
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(respBody))
+	}
+	var result LogContextResponse
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// --- Alerts ---
+
+type AlertItem struct {
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Severity    string `json:"severity"`
+	IsActive    bool   `json:"is_active"`
+	QueryMode   string `json:"query_mode"`
+	LastState   string `json:"last_state"`
+	CreatedAt   string `json:"created_at"`
+}
+
+type AlertsListResponse struct {
+	Status string      `json:"status"`
+	Data   []AlertItem `json:"data"`
+}
+
+type AlertHistoryEntry struct {
+	ID        int     `json:"id"`
+	AlertID   int     `json:"alert_id"`
+	Status    string  `json:"status"`
+	Value     float64 `json:"value"`
+	Error     string  `json:"error,omitempty"`
+	CreatedAt string  `json:"created_at"`
+}
+
+type AlertHistoryResponse struct {
+	Status string              `json:"status"`
+	Data   []AlertHistoryEntry `json:"data"`
+}
+
+func (c *Client) ListAlerts(ctx context.Context, teamID, sourceID int) (*AlertsListResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/teams/%d/sources/%d/alerts", c.config.BaseURL, teamID, sourceID)
+	httpReq, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.config.APIKey))
+	httpReq.Header.Set("Content-Type", "application/json")
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(respBody))
+	}
+	var result AlertsListResponse
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (c *Client) GetAlertHistory(ctx context.Context, teamID, sourceID, alertID int) (*AlertHistoryResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/teams/%d/sources/%d/alerts/%d/history", c.config.BaseURL, teamID, sourceID, alertID)
+	httpReq, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.config.APIKey))
+	httpReq.Header.Set("Content-Type", "application/json")
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(respBody))
+	}
+	var result AlertHistoryResponse
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
