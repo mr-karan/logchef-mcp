@@ -43,6 +43,9 @@ type disabledTools struct {
 	logchefql    bool
 	investigate  bool
 	admin        bool
+	analysis     bool
+	telemetry    bool
+	discover     bool
 }
 
 // Configuration for the Logchef client.
@@ -52,13 +55,16 @@ type logchefConfig struct {
 }
 
 func (dt *disabledTools) addFlags() {
-	flag.StringVar(&dt.enabledTools, "enabled-tools", "profile,sources,logs,logchefql,investigate,admin", "A comma separated list of tools enabled for this server.")
+	flag.StringVar(&dt.enabledTools, "enabled-tools", "profile,sources,logs,logchefql,investigate,admin,analysis,telemetry,discover", "A comma separated list of tools enabled for this server.")
 	flag.BoolVar(&dt.profile, "disable-profile", false, "Disable profile tools")
 	flag.BoolVar(&dt.sources, "disable-sources", false, "Disable sources tools")
 	flag.BoolVar(&dt.logs, "disable-logs", false, "Disable logs tools")
 	flag.BoolVar(&dt.logchefql, "disable-logchefql", false, "Disable LogchefQL tools")
 	flag.BoolVar(&dt.investigate, "disable-investigate", false, "Disable investigation tools (field values, log context, alerts)")
 	flag.BoolVar(&dt.admin, "disable-admin", false, "Disable admin tools")
+	flag.BoolVar(&dt.analysis, "disable-analysis", false, "Disable analysis tools (compare_windows, top_values)")
+	flag.BoolVar(&dt.telemetry, "disable-telemetry", false, "Disable telemetry tools (query performance data)")
+	flag.BoolVar(&dt.discover, "disable-discover", false, "Disable discovery tools (AI query generation, field dimensions)")
 }
 
 func (lc *logchefConfig) addFlags() {
@@ -73,14 +79,42 @@ func (dt *disabledTools) addTools(s *server.MCPServer) {
 	maybeAddTools(s, tools.AddLogchefQLTools, enabledTools, dt.logchefql, "logchefql")
 	maybeAddTools(s, tools.AddInvestigateTools, enabledTools, dt.investigate, "investigate")
 	maybeAddTools(s, tools.AddAdminTools, enabledTools, dt.admin, "admin")
+	maybeAddTools(s, tools.AddAnalysisTools, enabledTools, dt.analysis, "analysis")
+	maybeAddTools(s, tools.AddTelemetryTools, enabledTools, dt.telemetry, "telemetry")
+	maybeAddTools(s, tools.AddDiscoverTools, enabledTools, dt.discover, "discover")
+}
+
+func (dt *disabledTools) addResources(s *server.MCPServer) {
+	enabledTools := strings.Split(dt.enabledTools, ",")
+	// Resources depend on logs tools (schema endpoint)
+	if slices.Contains(enabledTools, "logs") && !dt.logs {
+		tools.AddResourceTemplates(s)
+	}
+}
+
+func (dt *disabledTools) addPrompts(s *server.MCPServer) {
+	enabledTools := strings.Split(dt.enabledTools, ",")
+	// Prompts require logchefql, investigate, and logs tools
+	logsEnabled := slices.Contains(enabledTools, "logs") && !dt.logs
+	logchefqlEnabled := slices.Contains(enabledTools, "logchefql") && !dt.logchefql
+	investigateEnabled := slices.Contains(enabledTools, "investigate") && !dt.investigate
+	if logsEnabled && logchefqlEnabled && investigateEnabled {
+		tools.AddPrompts(s)
+	}
 }
 
 func newServer(dt disabledTools) *server.MCPServer {
 	s := server.NewMCPServer(
 		"logchef-mcp",
 		version,
+		server.WithToolCapabilities(false),
+		server.WithResourceCapabilities(false, false),
+		server.WithPromptCapabilities(false),
+		server.WithRecovery(),
 	)
 	dt.addTools(s)
+	dt.addResources(s)
+	dt.addPrompts(s)
 	return s
 }
 

@@ -2,156 +2,180 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
+	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 
 	mcplogchef "github.com/mr-karan/logchef-mcp"
 	"github.com/mr-karan/logchef-mcp/client"
 )
 
-// Admin tool parameters and functions with role validation
+// --- Input schemas ---
 
-// ListAllTeamsParams represents the parameters for listing all teams (admin only).
 type ListAllTeamsParams struct{}
 
-// GetTeamParams represents the parameters for getting a specific team.
 type GetTeamParams struct {
-	TeamID int `json:"team_id" jsonschema:"description=The ID of the team to retrieve,required"`
+	TeamID int `json:"team_id" jsonschema:"The ID of the team to retrieve"`
 }
 
-// CreateTeamParams represents the parameters for creating a team (admin only).
 type CreateTeamParams struct {
-	Name        string `json:"name" jsonschema:"description=Name of the team,required"`
-	Description string `json:"description,omitempty" jsonschema:"description=Optional description of the team"`
+	Name        string `json:"name" jsonschema:"Name of the team"`
+	Description string `json:"description,omitempty" jsonschema:"Optional description of the team"`
 }
 
-// UpdateTeamParams represents the parameters for updating a team.
 type UpdateTeamParams struct {
-	TeamID      int     `json:"team_id" jsonschema:"description=The ID of the team to update,required"`
-	Name        *string `json:"name,omitempty" jsonschema:"description=New name for the team (optional)"`
-	Description *string `json:"description,omitempty" jsonschema:"description=New description for the team (optional)"`
+	TeamID      int     `json:"team_id" jsonschema:"The ID of the team to update"`
+	Name        *string `json:"name,omitempty" jsonschema:"New name for the team"`
+	Description *string `json:"description,omitempty" jsonschema:"New description for the team"`
 }
 
-// DeleteTeamParams represents the parameters for deleting a team (admin only).
 type DeleteTeamParams struct {
-	TeamID int `json:"team_id" jsonschema:"description=The ID of the team to delete,required"`
+	TeamID int `json:"team_id" jsonschema:"The ID of the team to delete"`
 }
 
-// ListTeamMembersParams represents the parameters for listing team members.
 type ListTeamMembersParams struct {
-	TeamID int `json:"team_id" jsonschema:"description=The ID of the team to list members for,required"`
+	TeamID int `json:"team_id" jsonschema:"The ID of the team to list members for"`
 }
 
-// AddTeamMemberParams represents the parameters for adding a team member.
 type AddTeamMemberParams struct {
-	TeamID int    `json:"team_id" jsonschema:"description=The ID of the team to add the member to,required"`
-	UserID int    `json:"user_id" jsonschema:"description=The ID of the user to add to the team,required"`
-	Role   string `json:"role" jsonschema:"description=The role to assign to the user in the team. Valid values: owner\\\\, admin\\\\, editor\\\\, member,required"`
+	TeamID int    `json:"team_id" jsonschema:"The ID of the team to add the member to"`
+	UserID int    `json:"user_id" jsonschema:"The ID of the user to add to the team"`
+	Role   string `json:"role" jsonschema:"Role to assign: owner admin editor or member"`
 }
 
-// RemoveTeamMemberParams represents the parameters for removing a team member.
 type RemoveTeamMemberParams struct {
-	TeamID int `json:"team_id" jsonschema:"description=The ID of the team to remove the member from,required"`
-	UserID int `json:"user_id" jsonschema:"description=The ID of the user to remove from the team,required"`
+	TeamID int `json:"team_id" jsonschema:"The ID of the team to remove the member from"`
+	UserID int `json:"user_id" jsonschema:"The ID of the user to remove from the team"`
 }
 
-// LinkSourceToTeamParams represents the parameters for linking a source to a team.
 type LinkSourceToTeamParams struct {
-	TeamID   int `json:"team_id" jsonschema:"description=The ID of the team to link the source to,required"`
-	SourceID int `json:"source_id" jsonschema:"description=The ID of the source to link to the team,required"`
+	TeamID   int `json:"team_id" jsonschema:"The ID of the team to link the source to"`
+	SourceID int `json:"source_id" jsonschema:"The ID of the source to link to the team"`
 }
 
-// UnlinkSourceFromTeamParams represents the parameters for unlinking a source from a team.
 type UnlinkSourceFromTeamParams struct {
-	TeamID   int `json:"team_id" jsonschema:"description=The ID of the team to unlink the source from,required"`
-	SourceID int `json:"source_id" jsonschema:"description=The ID of the source to unlink from the team,required"`
+	TeamID   int `json:"team_id" jsonschema:"The ID of the team to unlink the source from"`
+	SourceID int `json:"source_id" jsonschema:"The ID of the source to unlink from the team"`
 }
 
-// User management parameters
-
-// ListAllUsersParams represents the parameters for listing all users (admin only).
 type ListAllUsersParams struct{}
 
-// GetUserParams represents the parameters for getting a specific user (admin only).
 type GetUserParams struct {
-	UserID int `json:"user_id" jsonschema:"description=The ID of the user to retrieve,required"`
+	UserID int `json:"user_id" jsonschema:"The ID of the user to retrieve"`
 }
 
-// CreateUserParams represents the parameters for creating a user (admin only).
 type CreateUserParams struct {
-	Email    string `json:"email" jsonschema:"description=Email address of the user,required"`
-	FullName string `json:"full_name" jsonschema:"description=Full name of the user,required"`
-	Role     string `json:"role" jsonschema:"description=Role of the user. Valid values: admin\\\\, member,required"`
-	Status   string `json:"status" jsonschema:"description=Status of the user. Valid values: active\\\\, inactive,required"`
+	Email    string `json:"email" jsonschema:"Email address of the user"`
+	FullName string `json:"full_name" jsonschema:"Full name of the user"`
+	Role     string `json:"role" jsonschema:"Role of the user: admin or member"`
+	Status   string `json:"status" jsonschema:"Status of the user: active or inactive"`
 }
 
-// UpdateUserParams represents the parameters for updating a user (admin only).
 type UpdateUserParams struct {
-	UserID   int     `json:"user_id" jsonschema:"description=The ID of the user to update,required"`
-	Email    *string `json:"email,omitempty" jsonschema:"description=New email address for the user (optional)"`
-	FullName *string `json:"full_name,omitempty" jsonschema:"description=New full name for the user (optional)"`
-	Role     *string `json:"role,omitempty" jsonschema:"description=New role for the user. Valid values: admin\\\\, member (optional)"`
-	Status   *string `json:"status,omitempty" jsonschema:"description=New status for the user. Valid values: active\\\\, inactive (optional)"`
+	UserID   int     `json:"user_id" jsonschema:"The ID of the user to update"`
+	Email    *string `json:"email,omitempty" jsonschema:"New email address"`
+	FullName *string `json:"full_name,omitempty" jsonschema:"New full name"`
+	Role     *string `json:"role,omitempty" jsonschema:"New role: admin or member"`
+	Status   *string `json:"status,omitempty" jsonschema:"New status: active or inactive"`
 }
 
-// DeleteUserParams represents the parameters for deleting a user (admin only).
 type DeleteUserParams struct {
-	UserID int `json:"user_id" jsonschema:"description=The ID of the user to delete,required"`
+	UserID int `json:"user_id" jsonschema:"The ID of the user to delete"`
 }
 
-// API Token management parameters
-
-// ListAPITokensParams represents the parameters for listing API tokens.
 type ListAPITokensParams struct{}
 
-// CreateAPITokenParams represents the parameters for creating an API token.
 type CreateAPITokenParams struct {
-	Name      string  `json:"name" jsonschema:"description=Name for the API token,required"`
-	ExpiresAt *string `json:"expires_at,omitempty" jsonschema:"description=Optional expiration date for the token in ISO 8601 format (e.g. '2025-12-31T23:59:59Z')"`
+	Name      string  `json:"name" jsonschema:"Name for the API token"`
+	ExpiresAt *string `json:"expires_at,omitempty" jsonschema:"Optional expiration date in ISO 8601 format"`
 }
 
-// DeleteAPITokenParams represents the parameters for deleting an API token.
 type DeleteAPITokenParams struct {
-	TokenID int `json:"token_id" jsonschema:"description=The ID of the API token to delete,required"`
+	TokenID int `json:"token_id" jsonschema:"The ID of the API token to delete"`
 }
 
-// Admin Source management parameters
-
-// ListAllSourcesParams represents the parameters for listing all sources (admin only).
 type ListAllSourcesParams struct{}
 
-// CreateSourceParams represents the parameters for creating a source (admin only).
 type CreateSourceParams struct {
-	Name                 string                     `json:"name" jsonschema:"description=Name of the source,required"`
-	Description          string                     `json:"description,omitempty" jsonschema:"description=Optional description of the source"`
-	Host                 string                     `json:"host" jsonschema:"description=ClickHouse host,required"`
-	Database             string                     `json:"database" jsonschema:"description=ClickHouse database name,required"`
-	TableName            string                     `json:"table_name" jsonschema:"description=ClickHouse table name,required"`
-	MetaIsAutoCreated    bool                       `json:"_meta_is_auto_created" jsonschema:"description=Whether the table should be auto-created if it doesn't exist"`
-	MetaTsField          string                     `json:"_meta_ts_field" jsonschema:"description=Timestamp field name (defaults to 'timestamp'),required"`
-	MetaSeverityField    string                     `json:"_meta_severity_field,omitempty" jsonschema:"description=Optional severity field name"`
-	TTLDays              int                        `json:"ttl_days" jsonschema:"description=Time-to-live in days for log data,required"`
-	Schema               []map[string]interface{}   `json:"schema,omitempty" jsonschema:"description=Optional table schema for auto-creation"`
+	Name              string                   `json:"name" jsonschema:"Name of the source"`
+	Description       string                   `json:"description,omitempty" jsonschema:"Optional description of the source"`
+	Host              string                   `json:"host" jsonschema:"ClickHouse host"`
+	Database          string                   `json:"database" jsonschema:"ClickHouse database name"`
+	TableName         string                   `json:"table_name" jsonschema:"ClickHouse table name"`
+	MetaIsAutoCreated bool                     `json:"_meta_is_auto_created" jsonschema:"Whether the table should be auto-created"`
+	MetaTsField       string                   `json:"_meta_ts_field" jsonschema:"Timestamp field name (defaults to timestamp)"`
+	MetaSeverityField string                   `json:"_meta_severity_field,omitempty" jsonschema:"Optional severity field name"`
+	TTLDays           int                      `json:"ttl_days" jsonschema:"Time-to-live in days for log data"`
+	Schema            []map[string]interface{} `json:"schema,omitempty" jsonschema:"Optional table schema for auto-creation"`
 }
 
-// ValidateSourceConnectionParams represents the parameters for validating a source connection (admin only).
 type ValidateSourceConnectionParams struct {
-	Host           string `json:"host" jsonschema:"description=ClickHouse host,required"`
-	Database       string `json:"database" jsonschema:"description=ClickHouse database name,required"`
-	TableName      string `json:"table_name" jsonschema:"description=ClickHouse table name,required"`
-	TimestampField string `json:"timestamp_field,omitempty" jsonschema:"description=Optional timestamp field to validate"`
-	SeverityField  string `json:"severity_field,omitempty" jsonschema:"description=Optional severity field to validate"`
+	Host           string `json:"host" jsonschema:"ClickHouse host"`
+	Database       string `json:"database" jsonschema:"ClickHouse database name"`
+	TableName      string `json:"table_name" jsonschema:"ClickHouse table name"`
+	TimestampField string `json:"timestamp_field,omitempty" jsonschema:"Optional timestamp field to validate"`
+	SeverityField  string `json:"severity_field,omitempty" jsonschema:"Optional severity field to validate"`
 }
 
-// DeleteSourceParams represents the parameters for deleting a source (admin only).
 type DeleteSourceParams struct {
-	SourceID int `json:"source_id" jsonschema:"description=The ID of the source to delete,required"`
+	SourceID int `json:"source_id" jsonschema:"The ID of the source to delete"`
 }
 
-// GetAdminSourceStatsParams represents the parameters for getting source statistics (admin only).
 type GetAdminSourceStatsParams struct {
-	SourceID int `json:"source_id" jsonschema:"description=The ID of the source to get statistics for,required"`
+	SourceID int `json:"source_id" jsonschema:"The ID of the source to get statistics for"`
+}
+
+// --- Output schemas ---
+
+type AdminTeamResult struct {
+	ID          int    `json:"id" jsonschema:"Team ID"`
+	Name        string `json:"name" jsonschema:"Team name"`
+	Description string `json:"description" jsonschema:"Team description"`
+	MemberCount int    `json:"member_count" jsonschema:"Number of members"`
+	CreatedAt   string `json:"created_at" jsonschema:"Creation timestamp"`
+	UpdatedAt   string `json:"updated_at" jsonschema:"Last update timestamp"`
+}
+
+type TeamMemberResult struct {
+	TeamID   int    `json:"team_id" jsonschema:"Team ID"`
+	UserID   int    `json:"user_id" jsonschema:"User ID"`
+	Role     string `json:"role" jsonschema:"Member role in the team"`
+	Email    string `json:"email" jsonschema:"Member email"`
+	FullName string `json:"full_name" jsonschema:"Member full name"`
+}
+
+type AdminUserResult struct {
+	ID          int     `json:"id" jsonschema:"User ID"`
+	Email       string  `json:"email" jsonschema:"User email"`
+	FullName    string  `json:"full_name" jsonschema:"User full name"`
+	Role        string  `json:"role" jsonschema:"User role"`
+	Status      string  `json:"status" jsonschema:"User status"`
+	LastLoginAt *string `json:"last_login_at,omitempty" jsonschema:"Last login timestamp"`
+	CreatedAt   string  `json:"created_at" jsonschema:"Creation timestamp"`
+}
+
+type APITokenResult struct {
+	ID         int     `json:"id" jsonschema:"Token ID"`
+	Name       string  `json:"name" jsonschema:"Token name"`
+	Prefix     string  `json:"prefix" jsonschema:"Token prefix"`
+	LastUsedAt *string `json:"last_used_at,omitempty" jsonschema:"Last used timestamp"`
+	ExpiresAt  *string `json:"expires_at,omitempty" jsonschema:"Expiration timestamp"`
+	CreatedAt  string  `json:"created_at" jsonschema:"Creation timestamp"`
+}
+
+type APITokenCreateResult struct {
+	Token string         `json:"token" jsonschema:"The full API token value (only shown once)"`
+	Info  APITokenResult `json:"info" jsonschema:"Token metadata"`
+}
+
+type ValidationResult struct {
+	IsValid      bool            `json:"is_valid" jsonschema:"Whether the connection is valid"`
+	Message      string          `json:"message" jsonschema:"Validation message"`
+	ErrorDetails []string        `json:"error_details,omitempty" jsonschema:"Detailed error messages if validation failed"`
+	TableExists  bool            `json:"table_exists" jsonschema:"Whether the table exists"`
+	ColumnChecks map[string]bool `json:"column_checks,omitempty" jsonschema:"Per-column validation results"`
 }
 
 // Helper function to check if user has admin role
@@ -160,719 +184,607 @@ func checkAdminRole(ctx context.Context, c *client.Client) error {
 	if err != nil {
 		return fmt.Errorf("failed to get user profile: %w", err)
 	}
-
 	if profile.Data.User.Role != "admin" {
 		return fmt.Errorf("access denied: admin role required")
 	}
-
 	return nil
 }
 
-// Admin tool functions
+// --- Conversion helpers ---
 
-func listAllTeams(ctx context.Context, args ListAllTeamsParams) (*client.TeamsListResponse, error) {
+func teamToAdminResult(t client.Team) AdminTeamResult {
+	return AdminTeamResult{
+		ID: t.ID, Name: t.Name, Description: t.Description,
+		MemberCount: t.MemberCount, CreatedAt: t.CreatedAt, UpdatedAt: t.UpdatedAt,
+	}
+}
+
+func memberToResult(m client.TeamMember) TeamMemberResult {
+	return TeamMemberResult{
+		TeamID: m.TeamID, UserID: m.UserID, Role: m.Role,
+		Email: m.Email, FullName: m.FullName,
+	}
+}
+
+func userToResult(u client.User) AdminUserResult {
+	return AdminUserResult{
+		ID: u.ID, Email: u.Email, FullName: u.FullName,
+		Role: u.Role, Status: u.Status, LastLoginAt: u.LastLoginAt,
+		CreatedAt: u.CreatedAt,
+	}
+}
+
+func tokenToResult(t client.APIToken) APITokenResult {
+	return APITokenResult{
+		ID: t.ID, Name: t.Name, Prefix: t.Prefix,
+		LastUsedAt: t.LastUsedAt, ExpiresAt: t.ExpiresAt, CreatedAt: t.CreatedAt,
+	}
+}
+
+// --- Team management handlers ---
+
+func handleListAllTeams(ctx context.Context, request mcp.CallToolRequest, args ListAllTeamsParams) ([]AdminTeamResult, error) {
 	c := mcplogchef.LogchefClientFromContext(ctx)
 	if c == nil {
-		return nil, fmt.Errorf("Logchef client not found in context")
+		return nil, fmt.Errorf("logchef client not configured")
 	}
-
-	// Check admin role
 	if err := checkAdminRole(ctx, c); err != nil {
 		return nil, err
 	}
-
 	teams, err := c.ListAllTeams(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list all teams: %w", err)
 	}
-
-	return teams, nil
+	result := make([]AdminTeamResult, len(teams.Data))
+	for i, t := range teams.Data {
+		result[i] = teamToAdminResult(t)
+	}
+	return result, nil
 }
 
-func getTeam(ctx context.Context, args GetTeamParams) (*client.TeamResponse, error) {
+func handleGetTeam(ctx context.Context, request mcp.CallToolRequest, args GetTeamParams) (AdminTeamResult, error) {
 	c := mcplogchef.LogchefClientFromContext(ctx)
 	if c == nil {
-		return nil, fmt.Errorf("Logchef client not found in context")
+		return AdminTeamResult{}, fmt.Errorf("logchef client not configured")
 	}
-
 	team, err := c.GetTeamByID(ctx, args.TeamID)
 	if err != nil {
-		return nil, fmt.Errorf("get team: %w", err)
+		return AdminTeamResult{}, fmt.Errorf("get team: %w", err)
 	}
-
-	return team, nil
+	return teamToAdminResult(team.Data), nil
 }
 
-func createTeam(ctx context.Context, args CreateTeamParams) (*client.TeamResponse, error) {
+func handleCreateTeam(ctx context.Context, request mcp.CallToolRequest, args CreateTeamParams) (AdminTeamResult, error) {
 	c := mcplogchef.LogchefClientFromContext(ctx)
 	if c == nil {
-		return nil, fmt.Errorf("Logchef client not found in context")
+		return AdminTeamResult{}, fmt.Errorf("logchef client not configured")
 	}
-
-	// Check admin role
 	if err := checkAdminRole(ctx, c); err != nil {
-		return nil, err
+		return AdminTeamResult{}, err
 	}
-
-	request := client.TeamRequest{
-		Name:        args.Name,
-		Description: args.Description,
-	}
-
-	team, err := c.CreateTeam(ctx, request)
+	team, err := c.CreateTeam(ctx, client.TeamRequest{Name: args.Name, Description: args.Description})
 	if err != nil {
-		return nil, fmt.Errorf("create team: %w", err)
+		return AdminTeamResult{}, fmt.Errorf("create team: %w", err)
 	}
-
-	return team, nil
+	return teamToAdminResult(team.Data), nil
 }
 
-func updateTeam(ctx context.Context, args UpdateTeamParams) (*client.TeamResponse, error) {
+func handleUpdateTeam(ctx context.Context, request mcp.CallToolRequest, args UpdateTeamParams) (AdminTeamResult, error) {
 	c := mcplogchef.LogchefClientFromContext(ctx)
 	if c == nil {
-		return nil, fmt.Errorf("Logchef client not found in context")
+		return AdminTeamResult{}, fmt.Errorf("logchef client not configured")
 	}
-
-	request := client.TeamUpdateRequest{
-		Name:        args.Name,
-		Description: args.Description,
-	}
-
-	team, err := c.UpdateTeam(ctx, args.TeamID, request)
+	team, err := c.UpdateTeam(ctx, args.TeamID, client.TeamUpdateRequest{Name: args.Name, Description: args.Description})
 	if err != nil {
-		return nil, fmt.Errorf("update team: %w", err)
+		return AdminTeamResult{}, fmt.Errorf("update team: %w", err)
 	}
-
-	return team, nil
+	return teamToAdminResult(team.Data), nil
 }
 
-type DeleteTeamResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
-}
-
-func deleteTeam(ctx context.Context, args DeleteTeamParams) (*DeleteTeamResponse, error) {
+func handleDeleteTeam(ctx context.Context, request mcp.CallToolRequest, args DeleteTeamParams) (SuccessResult, error) {
 	c := mcplogchef.LogchefClientFromContext(ctx)
 	if c == nil {
-		return nil, fmt.Errorf("Logchef client not found in context")
+		return SuccessResult{}, fmt.Errorf("logchef client not configured")
 	}
-
-	// Check admin role
 	if err := checkAdminRole(ctx, c); err != nil {
-		return nil, err
+		return SuccessResult{}, err
 	}
-
-	err := c.DeleteTeam(ctx, args.TeamID)
-	if err != nil {
-		return nil, fmt.Errorf("delete team: %w", err)
+	if err := c.DeleteTeam(ctx, args.TeamID); err != nil {
+		return SuccessResult{}, fmt.Errorf("delete team: %w", err)
 	}
-
-	return &DeleteTeamResponse{
-		Success: true,
-		Message: "Team deleted successfully",
-	}, nil
+	return SuccessResult{Success: true, Message: "Team deleted successfully"}, nil
 }
 
-func listTeamMembers(ctx context.Context, args ListTeamMembersParams) (*client.TeamMembersResponse, error) {
+func handleListTeamMembers(ctx context.Context, request mcp.CallToolRequest, args ListTeamMembersParams) ([]TeamMemberResult, error) {
 	c := mcplogchef.LogchefClientFromContext(ctx)
 	if c == nil {
-		return nil, fmt.Errorf("Logchef client not found in context")
+		return nil, fmt.Errorf("logchef client not configured")
 	}
-
 	members, err := c.ListTeamMembers(ctx, args.TeamID)
 	if err != nil {
 		return nil, fmt.Errorf("list team members: %w", err)
 	}
-
-	return members, nil
+	result := make([]TeamMemberResult, len(members.Data))
+	for i, m := range members.Data {
+		result[i] = memberToResult(m)
+	}
+	return result, nil
 }
 
-type AddTeamMemberResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
-}
-
-func addTeamMember(ctx context.Context, args AddTeamMemberParams) (*AddTeamMemberResponse, error) {
+func handleAddTeamMember(ctx context.Context, request mcp.CallToolRequest, args AddTeamMemberParams) (SuccessResult, error) {
 	c := mcplogchef.LogchefClientFromContext(ctx)
 	if c == nil {
-		return nil, fmt.Errorf("Logchef client not found in context")
+		return SuccessResult{}, fmt.Errorf("logchef client not configured")
 	}
-
-	request := client.TeamMemberRequest{
-		UserID: args.UserID,
-		Role:   args.Role,
+	if err := c.AddTeamMember(ctx, args.TeamID, client.TeamMemberRequest{UserID: args.UserID, Role: args.Role}); err != nil {
+		return SuccessResult{}, fmt.Errorf("add team member: %w", err)
 	}
-
-	err := c.AddTeamMember(ctx, args.TeamID, request)
-	if err != nil {
-		return nil, fmt.Errorf("add team member: %w", err)
-	}
-
-	return &AddTeamMemberResponse{
-		Success: true,
-		Message: "Team member added successfully",
-	}, nil
+	return SuccessResult{Success: true, Message: "Team member added successfully"}, nil
 }
 
-type RemoveTeamMemberResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
-}
-
-func removeTeamMember(ctx context.Context, args RemoveTeamMemberParams) (*RemoveTeamMemberResponse, error) {
+func handleRemoveTeamMember(ctx context.Context, request mcp.CallToolRequest, args RemoveTeamMemberParams) (SuccessResult, error) {
 	c := mcplogchef.LogchefClientFromContext(ctx)
 	if c == nil {
-		return nil, fmt.Errorf("Logchef client not found in context")
+		return SuccessResult{}, fmt.Errorf("logchef client not configured")
 	}
-
-	err := c.RemoveTeamMember(ctx, args.TeamID, args.UserID)
-	if err != nil {
-		return nil, fmt.Errorf("remove team member: %w", err)
+	if err := c.RemoveTeamMember(ctx, args.TeamID, args.UserID); err != nil {
+		return SuccessResult{}, fmt.Errorf("remove team member: %w", err)
 	}
-
-	return &RemoveTeamMemberResponse{
-		Success: true,
-		Message: "Team member removed successfully",
-	}, nil
+	return SuccessResult{Success: true, Message: "Team member removed successfully"}, nil
 }
 
-type LinkSourceResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
-}
-
-func linkSourceToTeam(ctx context.Context, args LinkSourceToTeamParams) (*LinkSourceResponse, error) {
+func handleLinkSourceToTeam(ctx context.Context, request mcp.CallToolRequest, args LinkSourceToTeamParams) (SuccessResult, error) {
 	c := mcplogchef.LogchefClientFromContext(ctx)
 	if c == nil {
-		return nil, fmt.Errorf("Logchef client not found in context")
+		return SuccessResult{}, fmt.Errorf("logchef client not configured")
 	}
-
-	request := client.TeamSourceRequest{
-		SourceID: args.SourceID,
+	if err := c.LinkSourceToTeam(ctx, args.TeamID, client.TeamSourceRequest{SourceID: args.SourceID}); err != nil {
+		return SuccessResult{}, fmt.Errorf("link source to team: %w", err)
 	}
-
-	err := c.LinkSourceToTeam(ctx, args.TeamID, request)
-	if err != nil {
-		return nil, fmt.Errorf("link source to team: %w", err)
-	}
-
-	return &LinkSourceResponse{
-		Success: true,
-		Message: "Source linked to team successfully",
-	}, nil
+	return SuccessResult{Success: true, Message: "Source linked to team successfully"}, nil
 }
 
-type UnlinkSourceResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
-}
-
-func unlinkSourceFromTeam(ctx context.Context, args UnlinkSourceFromTeamParams) (*UnlinkSourceResponse, error) {
+func handleUnlinkSourceFromTeam(ctx context.Context, request mcp.CallToolRequest, args UnlinkSourceFromTeamParams) (SuccessResult, error) {
 	c := mcplogchef.LogchefClientFromContext(ctx)
 	if c == nil {
-		return nil, fmt.Errorf("Logchef client not found in context")
+		return SuccessResult{}, fmt.Errorf("logchef client not configured")
 	}
-
-	err := c.UnlinkSourceFromTeam(ctx, args.TeamID, args.SourceID)
-	if err != nil {
-		return nil, fmt.Errorf("unlink source from team: %w", err)
+	if err := c.UnlinkSourceFromTeam(ctx, args.TeamID, args.SourceID); err != nil {
+		return SuccessResult{}, fmt.Errorf("unlink source from team: %w", err)
 	}
-
-	return &UnlinkSourceResponse{
-		Success: true,
-		Message: "Source unlinked from team successfully",
-	}, nil
+	return SuccessResult{Success: true, Message: "Source unlinked from team successfully"}, nil
 }
 
-// User management tool functions
+// --- User management handlers ---
 
-func listAllUsers(ctx context.Context, args ListAllUsersParams) (*client.UsersListResponse, error) {
+func handleListAllUsers(ctx context.Context, request mcp.CallToolRequest, args ListAllUsersParams) ([]AdminUserResult, error) {
 	c := mcplogchef.LogchefClientFromContext(ctx)
 	if c == nil {
-		return nil, fmt.Errorf("Logchef client not found in context")
+		return nil, fmt.Errorf("logchef client not configured")
 	}
-
-	// Check admin role
 	if err := checkAdminRole(ctx, c); err != nil {
 		return nil, err
 	}
-
 	users, err := c.ListAllUsers(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list all users: %w", err)
 	}
-
-	return users, nil
+	result := make([]AdminUserResult, len(users.Data))
+	for i, u := range users.Data {
+		result[i] = userToResult(u)
+	}
+	return result, nil
 }
 
-func getUser(ctx context.Context, args GetUserParams) (*client.UserResponse, error) {
+func handleGetUser(ctx context.Context, request mcp.CallToolRequest, args GetUserParams) (AdminUserResult, error) {
 	c := mcplogchef.LogchefClientFromContext(ctx)
 	if c == nil {
-		return nil, fmt.Errorf("Logchef client not found in context")
+		return AdminUserResult{}, fmt.Errorf("logchef client not configured")
 	}
-
-	// Check admin role
 	if err := checkAdminRole(ctx, c); err != nil {
-		return nil, err
+		return AdminUserResult{}, err
 	}
-
 	user, err := c.GetUserByID(ctx, args.UserID)
 	if err != nil {
-		return nil, fmt.Errorf("get user: %w", err)
+		return AdminUserResult{}, fmt.Errorf("get user: %w", err)
 	}
-
-	return user, nil
+	return userToResult(user.Data), nil
 }
 
-func createUser(ctx context.Context, args CreateUserParams) (*client.UserResponse, error) {
+func handleCreateUser(ctx context.Context, request mcp.CallToolRequest, args CreateUserParams) (AdminUserResult, error) {
 	c := mcplogchef.LogchefClientFromContext(ctx)
 	if c == nil {
-		return nil, fmt.Errorf("Logchef client not found in context")
+		return AdminUserResult{}, fmt.Errorf("logchef client not configured")
 	}
-
-	// Check admin role
 	if err := checkAdminRole(ctx, c); err != nil {
-		return nil, err
+		return AdminUserResult{}, err
 	}
-
-	request := client.UserRequest{
-		Email:    args.Email,
-		FullName: args.FullName,
-		Role:     args.Role,
-		Status:   args.Status,
-	}
-
-	user, err := c.CreateUser(ctx, request)
+	user, err := c.CreateUser(ctx, client.UserRequest{
+		Email: args.Email, FullName: args.FullName, Role: args.Role, Status: args.Status,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("create user: %w", err)
+		return AdminUserResult{}, fmt.Errorf("create user: %w", err)
 	}
-
-	return user, nil
+	return userToResult(user.Data), nil
 }
 
-func updateUser(ctx context.Context, args UpdateUserParams) (*client.UserResponse, error) {
+func handleUpdateUser(ctx context.Context, request mcp.CallToolRequest, args UpdateUserParams) (AdminUserResult, error) {
 	c := mcplogchef.LogchefClientFromContext(ctx)
 	if c == nil {
-		return nil, fmt.Errorf("Logchef client not found in context")
+		return AdminUserResult{}, fmt.Errorf("logchef client not configured")
 	}
-
-	// Check admin role
 	if err := checkAdminRole(ctx, c); err != nil {
-		return nil, err
+		return AdminUserResult{}, err
 	}
-
-	request := client.UserUpdateRequest{
-		Email:    args.Email,
-		FullName: args.FullName,
-		Role:     args.Role,
-		Status:   args.Status,
-	}
-
-	user, err := c.UpdateUser(ctx, args.UserID, request)
+	user, err := c.UpdateUser(ctx, args.UserID, client.UserUpdateRequest{
+		Email: args.Email, FullName: args.FullName, Role: args.Role, Status: args.Status,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("update user: %w", err)
+		return AdminUserResult{}, fmt.Errorf("update user: %w", err)
 	}
-
-	return user, nil
+	return userToResult(user.Data), nil
 }
 
-type DeleteUserResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
-}
-
-func deleteUser(ctx context.Context, args DeleteUserParams) (*DeleteUserResponse, error) {
+func handleDeleteUser(ctx context.Context, request mcp.CallToolRequest, args DeleteUserParams) (SuccessResult, error) {
 	c := mcplogchef.LogchefClientFromContext(ctx)
 	if c == nil {
-		return nil, fmt.Errorf("Logchef client not found in context")
+		return SuccessResult{}, fmt.Errorf("logchef client not configured")
 	}
-
-	// Check admin role
 	if err := checkAdminRole(ctx, c); err != nil {
-		return nil, err
+		return SuccessResult{}, err
 	}
-
-	err := c.DeleteUser(ctx, args.UserID)
-	if err != nil {
-		return nil, fmt.Errorf("delete user: %w", err)
+	if err := c.DeleteUser(ctx, args.UserID); err != nil {
+		return SuccessResult{}, fmt.Errorf("delete user: %w", err)
 	}
-
-	return &DeleteUserResponse{
-		Success: true,
-		Message: "User deleted successfully",
-	}, nil
+	return SuccessResult{Success: true, Message: "User deleted successfully"}, nil
 }
 
-// API Token management tool functions
+// --- API Token handlers ---
 
-func listAPITokens(ctx context.Context, args ListAPITokensParams) (*client.APITokensResponse, error) {
+func handleListAPITokens(ctx context.Context, request mcp.CallToolRequest, args ListAPITokensParams) ([]APITokenResult, error) {
 	c := mcplogchef.LogchefClientFromContext(ctx)
 	if c == nil {
-		return nil, fmt.Errorf("Logchef client not found in context")
+		return nil, fmt.Errorf("logchef client not configured")
 	}
-
 	tokens, err := c.ListAPITokens(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list API tokens: %w", err)
 	}
-
-	return tokens, nil
+	result := make([]APITokenResult, len(tokens.Data))
+	for i, t := range tokens.Data {
+		result[i] = tokenToResult(t)
+	}
+	return result, nil
 }
 
-func createAPIToken(ctx context.Context, args CreateAPITokenParams) (*client.APITokenResponse, error) {
+func handleCreateAPIToken(ctx context.Context, request mcp.CallToolRequest, args CreateAPITokenParams) (APITokenCreateResult, error) {
 	c := mcplogchef.LogchefClientFromContext(ctx)
 	if c == nil {
-		return nil, fmt.Errorf("Logchef client not found in context")
+		return APITokenCreateResult{}, fmt.Errorf("logchef client not configured")
 	}
-
-	request := client.APITokenRequest{
-		Name:      args.Name,
-		ExpiresAt: args.ExpiresAt,
-	}
-
-	token, err := c.CreateAPIToken(ctx, request)
+	token, err := c.CreateAPIToken(ctx, client.APITokenRequest{Name: args.Name, ExpiresAt: args.ExpiresAt})
 	if err != nil {
-		return nil, fmt.Errorf("create API token: %w", err)
+		return APITokenCreateResult{}, fmt.Errorf("create API token: %w", err)
 	}
-
-	return token, nil
-}
-
-type DeleteAPITokenResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
-}
-
-func deleteAPIToken(ctx context.Context, args DeleteAPITokenParams) (*DeleteAPITokenResponse, error) {
-	c := mcplogchef.LogchefClientFromContext(ctx)
-	if c == nil {
-		return nil, fmt.Errorf("Logchef client not found in context")
-	}
-
-	err := c.DeleteAPIToken(ctx, args.TokenID)
-	if err != nil {
-		return nil, fmt.Errorf("delete API token: %w", err)
-	}
-
-	return &DeleteAPITokenResponse{
-		Success: true,
-		Message: "API token deleted successfully",
+	return APITokenCreateResult{
+		Token: token.Data.Token,
+		Info:  tokenToResult(token.Data.APIToken),
 	}, nil
 }
 
-// Admin source management tool functions
-
-func listAllSources(ctx context.Context, args ListAllSourcesParams) (*client.SourcesListResponse, error) {
+func handleDeleteAPIToken(ctx context.Context, request mcp.CallToolRequest, args DeleteAPITokenParams) (SuccessResult, error) {
 	c := mcplogchef.LogchefClientFromContext(ctx)
 	if c == nil {
-		return nil, fmt.Errorf("Logchef client not found in context")
+		return SuccessResult{}, fmt.Errorf("logchef client not configured")
 	}
+	if err := c.DeleteAPIToken(ctx, args.TokenID); err != nil {
+		return SuccessResult{}, fmt.Errorf("delete API token: %w", err)
+	}
+	return SuccessResult{Success: true, Message: "API token deleted successfully"}, nil
+}
 
-	// Check admin role
+// --- Admin source handlers ---
+
+func handleListAllSources(ctx context.Context, request mcp.CallToolRequest, args ListAllSourcesParams) ([]SourceResult, error) {
+	c := mcplogchef.LogchefClientFromContext(ctx)
+	if c == nil {
+		return nil, fmt.Errorf("logchef client not configured")
+	}
 	if err := checkAdminRole(ctx, c); err != nil {
 		return nil, err
 	}
-
 	sources, err := c.ListAllSources(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list all sources: %w", err)
 	}
-
-	return sources, nil
+	result := make([]SourceResult, len(sources.Data))
+	for i, s := range sources.Data {
+		result[i] = SourceResult{
+			ID: s.ID, Name: s.Name, Description: s.Description,
+			Connection: ConnectionResult{Host: s.Connection.Host, Database: s.Connection.Database, TableName: s.Connection.TableName},
+			TsField: s.MetaTsField, IsConnected: s.IsConnected, TTLDays: s.TTLDays, CreatedAt: s.CreatedAt,
+		}
+	}
+	return result, nil
 }
 
-func createSource(ctx context.Context, args CreateSourceParams) (*client.AdminSourceResponse, error) {
+func handleCreateSource(ctx context.Context, request mcp.CallToolRequest, args CreateSourceParams) (SourceResult, error) {
 	c := mcplogchef.LogchefClientFromContext(ctx)
 	if c == nil {
-		return nil, fmt.Errorf("Logchef client not found in context")
+		return SourceResult{}, fmt.Errorf("logchef client not configured")
 	}
-
-	// Check admin role
 	if err := checkAdminRole(ctx, c); err != nil {
-		return nil, err
+		return SourceResult{}, err
 	}
 
-	// Convert schema from map to LogColumn if provided
 	var schema []client.LogColumn
 	if args.Schema != nil {
-		schema = make([]client.LogColumn, len(args.Schema))
-		for i, col := range args.Schema {
-			if name, ok := col["name"].(string); ok {
-				if colType, ok := col["type"].(string); ok {
-					schema[i] = client.LogColumn{
-						Name: name,
-						Type: colType,
-					}
-				}
+		schema = make([]client.LogColumn, 0, len(args.Schema))
+		for _, col := range args.Schema {
+			name, _ := col["name"].(string)
+			colType, _ := col["type"].(string)
+			if name != "" && colType != "" {
+				schema = append(schema, client.LogColumn{Name: name, Type: colType})
 			}
 		}
 	}
 
-	request := client.SourceRequest{
-		Name:        args.Name,
-		Description: args.Description,
-		Connection: client.SourceConnection{
-			Host:      args.Host,
-			Database:  args.Database,
-			TableName: args.TableName,
-		},
-		MetaIsAutoCreated: args.MetaIsAutoCreated,
-		MetaTsField:       args.MetaTsField,
-		MetaSeverityField: args.MetaSeverityField,
-		TTLDays:           args.TTLDays,
-		Schema:            schema,
-	}
-
-	source, err := c.CreateSource(ctx, request)
+	source, err := c.CreateSource(ctx, client.SourceRequest{
+		Name: args.Name, Description: args.Description,
+		Connection:        client.SourceConnection{Host: args.Host, Database: args.Database, TableName: args.TableName},
+		MetaIsAutoCreated: args.MetaIsAutoCreated, MetaTsField: args.MetaTsField, MetaSeverityField: args.MetaSeverityField,
+		TTLDays: args.TTLDays, Schema: schema,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("create source: %w", err)
+		return SourceResult{}, fmt.Errorf("create source: %w", err)
 	}
-
-	return source, nil
-}
-
-func validateSourceConnection(ctx context.Context, args ValidateSourceConnectionParams) (*client.SourceValidationResponse, error) {
-	c := mcplogchef.LogchefClientFromContext(ctx)
-	if c == nil {
-		return nil, fmt.Errorf("Logchef client not found in context")
-	}
-
-	// Check admin role
-	if err := checkAdminRole(ctx, c); err != nil {
-		return nil, err
-	}
-
-	request := client.SourceValidationRequest{
-		Host:           args.Host,
-		Database:       args.Database,
-		TableName:      args.TableName,
-		TimestampField: args.TimestampField,
-		SeverityField:  args.SeverityField,
-	}
-
-	validation, err := c.ValidateSourceConnection(ctx, request)
-	if err != nil {
-		return nil, fmt.Errorf("validate source connection: %w", err)
-	}
-
-	return validation, nil
-}
-
-type DeleteSourceResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
-}
-
-func deleteSource(ctx context.Context, args DeleteSourceParams) (*DeleteSourceResponse, error) {
-	c := mcplogchef.LogchefClientFromContext(ctx)
-	if c == nil {
-		return nil, fmt.Errorf("Logchef client not found in context")
-	}
-
-	// Check admin role
-	if err := checkAdminRole(ctx, c); err != nil {
-		return nil, err
-	}
-
-	err := c.DeleteSource(ctx, args.SourceID)
-	if err != nil {
-		return nil, fmt.Errorf("delete source: %w", err)
-	}
-
-	return &DeleteSourceResponse{
-		Success: true,
-		Message: "Source deleted successfully",
+	s := source.Data
+	return SourceResult{
+		ID: s.ID, Name: s.Name, Description: s.Description,
+		Connection: ConnectionResult{Host: s.Connection.Host, Database: s.Connection.Database, TableName: s.Connection.TableName},
+		TsField: s.MetaTsField, IsConnected: s.IsConnected, TTLDays: s.TTLDays, CreatedAt: s.CreatedAt,
 	}, nil
 }
 
-func getAdminSourceStats(ctx context.Context, args GetAdminSourceStatsParams) (*client.SourceStatsResponse, error) {
+func handleValidateSourceConnection(ctx context.Context, request mcp.CallToolRequest, args ValidateSourceConnectionParams) (ValidationResult, error) {
 	c := mcplogchef.LogchefClientFromContext(ctx)
 	if c == nil {
-		return nil, fmt.Errorf("Logchef client not found in context")
+		return ValidationResult{}, fmt.Errorf("logchef client not configured")
 	}
-
-	// Check admin role
 	if err := checkAdminRole(ctx, c); err != nil {
-		return nil, err
+		return ValidationResult{}, err
 	}
-
-	stats, err := c.GetAdminSourceStats(ctx, args.SourceID)
+	v, err := c.ValidateSourceConnection(ctx, client.SourceValidationRequest{
+		Host: args.Host, Database: args.Database, TableName: args.TableName,
+		TimestampField: args.TimestampField, SeverityField: args.SeverityField,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("get admin source stats: %w", err)
+		return ValidationResult{}, fmt.Errorf("validate source connection: %w", err)
 	}
-
-	return stats, nil
+	return ValidationResult{
+		IsValid: v.Data.IsValid, Message: v.Data.Message,
+		ErrorDetails: v.Data.ErrorDetails, TableExists: v.Data.TableExists,
+		ColumnChecks: v.Data.ColumnChecks,
+	}, nil
 }
 
-// Tool definitions
+func handleDeleteSource(ctx context.Context, request mcp.CallToolRequest, args DeleteSourceParams) (SuccessResult, error) {
+	c := mcplogchef.LogchefClientFromContext(ctx)
+	if c == nil {
+		return SuccessResult{}, fmt.Errorf("logchef client not configured")
+	}
+	if err := checkAdminRole(ctx, c); err != nil {
+		return SuccessResult{}, err
+	}
+	if err := c.DeleteSource(ctx, args.SourceID); err != nil {
+		return SuccessResult{}, fmt.Errorf("delete source: %w", err)
+	}
+	return SuccessResult{Success: true, Message: "Source deleted successfully"}, nil
+}
 
-var ListAllTeams = mcplogchef.MustTool(
-	"list_all_teams",
-	"List all teams in the system. This is an admin-only operation that requires admin role privileges. Returns a list of all teams with their details including member counts.",
-	listAllTeams,
-)
+func handleGetAdminSourceStats(ctx context.Context, request mcp.CallToolRequest, args GetAdminSourceStatsParams) (*mcp.CallToolResult, error) {
+	c := mcplogchef.LogchefClientFromContext(ctx)
+	if c == nil {
+		return mcp.NewToolResultError("logchef client not configured"), nil
+	}
+	if err := checkAdminRole(ctx, c); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	stats, err := c.GetAdminSourceStats(ctx, args.SourceID)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("get admin source stats: %v", err)), nil
+	}
+	// Stats have nested/dynamic structure — use typed handler with JSON output
+	out, _ := json.MarshalIndent(stats.Data, "", "  ")
+	return mcp.NewToolResultText(string(out)), nil
+}
 
-var GetTeam = mcplogchef.MustTool(
-	"get_team",
-	"Get detailed information about a specific team by ID. Returns team details including name, description, member count, and timestamps. Available to team members and admins.",
-	getTeam,
-)
-
-var CreateTeam = mcplogchef.MustTool(
-	"create_team",
-	"Create a new team. This is an admin-only operation that requires admin role privileges. Provide a team name and optional description to create a new team.",
-	createTeam,
-)
-
-var UpdateTeam = mcplogchef.MustTool(
-	"update_team",
-	"Update an existing team's name and/or description. Requires team admin privileges or global admin role. Provide the team ID and the fields you want to update.",
-	updateTeam,
-)
-
-var DeleteTeam = mcplogchef.MustTool(
-	"delete_team",
-	"Delete a team permanently. This is an admin-only operation that requires admin role privileges. This action cannot be undone and will remove all team associations.",
-	deleteTeam,
-)
-
-var ListTeamMembers = mcplogchef.MustTool(
-	"list_team_members",
-	"List all members of a specific team. Returns member details including user information, roles, and join dates. Available to team members and admins.",
-	listTeamMembers,
-)
-
-var AddTeamMember = mcplogchef.MustTool(
-	"add_team_member",
-	"Add a user to a team with a specific role. Requires team admin privileges or global admin role. Valid roles are: owner, admin, editor, member.",
-	addTeamMember,
-)
-
-var RemoveTeamMember = mcplogchef.MustTool(
-	"remove_team_member",
-	"Remove a user from a team. Requires team admin privileges or global admin role. This will revoke the user's access to team resources.",
-	removeTeamMember,
-)
-
-var LinkSourceToTeam = mcplogchef.MustTool(
-	"link_source_to_team",
-	"Link a log source to a team, granting team members access to query logs from that source. Requires team admin privileges or global admin role.",
-	linkSourceToTeam,
-)
-
-var UnlinkSourceFromTeam = mcplogchef.MustTool(
-	"unlink_source_from_team",
-	"Remove a log source from a team, revoking team members' access to that source. Requires team admin privileges or global admin role.",
-	unlinkSourceFromTeam,
-)
-
-var ListAllUsers = mcplogchef.MustTool(
-	"list_all_users",
-	"List all users in the system. This is an admin-only operation that requires admin role privileges. Returns a list of all users with their details including roles, status, and activity information.",
-	listAllUsers,
-)
-
-var GetUser = mcplogchef.MustTool(
-	"get_user",
-	"Get detailed information about a specific user by ID. This is an admin-only operation that requires admin role privileges. Returns user details including email, role, status, and timestamps.",
-	getUser,
-)
-
-var CreateUser = mcplogchef.MustTool(
-	"create_user",
-	"Create a new user in the system. This is an admin-only operation that requires admin role privileges. Provide email, full name, role (admin/member), and status (active/inactive).",
-	createUser,
-)
-
-var UpdateUser = mcplogchef.MustTool(
-	"update_user",
-	"Update an existing user's information. This is an admin-only operation that requires admin role privileges. You can update email, full name, role, and status. All fields are optional - provide only the fields you want to change.",
-	updateUser,
-)
-
-var DeleteUser = mcplogchef.MustTool(
-	"delete_user",
-	"Delete a user from the system. This is an admin-only operation that requires admin role privileges. This action cannot be undone and will remove all user associations. Cannot delete the last admin user.",
-	deleteUser,
-)
-
-var ListAPITokens = mcplogchef.MustTool(
-	"list_api_tokens",
-	"List all API tokens for the current authenticated user. Returns token details including names, prefixes, last used timestamps, and expiration dates. Does not require admin privileges.",
-	listAPITokens,
-)
-
-var CreateAPIToken = mcplogchef.MustTool(
-	"create_api_token",
-	"Create a new API token for the current authenticated user. Provide a name for the token and optionally an expiration date. Returns the full token value (only shown once) and token metadata.",
-	createAPIToken,
-)
-
-var DeleteAPIToken = mcplogchef.MustTool(
-	"delete_api_token",
-	"Delete an API token belonging to the current authenticated user. This will immediately revoke access for any applications using this token. This action cannot be undone.",
-	deleteAPIToken,
-)
-
-var ListAllSources = mcplogchef.MustTool(
-	"list_all_sources",
-	"List all log sources in the system. This is an admin-only operation that requires admin role privileges. Returns a list of all sources with their connection details, status, and metadata.",
-	listAllSources,
-)
-
-var CreateSource = mcplogchef.MustTool(
-	"create_source",
-	"Create a new log source in the system. This is an admin-only operation that requires admin role privileges. Provide ClickHouse connection details, metadata configuration, and optional table schema for auto-creation.",
-	createSource,
-)
-
-var ValidateSourceConnection = mcplogchef.MustTool(
-	"validate_source_connection",
-	"Validate ClickHouse connection details before creating a source. This is an admin-only operation that requires admin role privileges. Tests connectivity, table existence, and optionally validates timestamp and severity fields.",
-	validateSourceConnection,
-)
-
-var DeleteSource = mcplogchef.MustTool(
-	"delete_source",
-	"Delete a log source from the system. This is an admin-only operation that requires admin role privileges. This action cannot be undone and will remove all source associations with teams.",
-	deleteSource,
-)
-
-var GetAdminSourceStats = mcplogchef.MustTool(
-	"get_admin_source_stats",
-	"Get detailed statistics for a specific log source. This is an admin-only operation that requires admin role privileges. Returns ClickHouse table statistics including row count, compressed/uncompressed sizes, compression ratio, part count, and column statistics.",
-	getAdminSourceStats,
-)
-
-func AddAdminTools(mcp *server.MCPServer) {
+func AddAdminTools(s *server.MCPServer) {
 	// Team management tools
-	ListAllTeams.Register(mcp)
-	GetTeam.Register(mcp)
-	CreateTeam.Register(mcp)
-	UpdateTeam.Register(mcp)
-	DeleteTeam.Register(mcp)
-	ListTeamMembers.Register(mcp)
-	AddTeamMember.Register(mcp)
-	RemoveTeamMember.Register(mcp)
-	LinkSourceToTeam.Register(mcp)
-	UnlinkSourceFromTeam.Register(mcp)
-	
+	s.AddTool(mcp.NewTool("list_all_teams",
+		mcp.WithDescription("List all teams in the system (admin only). Returns all teams with details including member counts."),
+		mcp.WithInputSchema[ListAllTeamsParams](),
+		mcp.WithOutputSchema[[]AdminTeamResult](),
+		mcp.WithTitleAnnotation("List All Teams"),
+		mcp.WithReadOnlyHintAnnotation(true),
+	), mcp.NewStructuredToolHandler(handleListAllTeams))
+
+	s.AddTool(mcp.NewTool("get_team",
+		mcp.WithDescription("Get detailed information about a specific team by ID. Available to team members and admins."),
+		mcp.WithInputSchema[GetTeamParams](),
+		mcp.WithOutputSchema[AdminTeamResult](),
+		mcp.WithTitleAnnotation("Get Team"),
+		mcp.WithReadOnlyHintAnnotation(true),
+	), mcp.NewStructuredToolHandler(handleGetTeam))
+
+	s.AddTool(mcp.NewTool("create_team",
+		mcp.WithDescription("Create a new team (admin only). Provide a team name and optional description."),
+		mcp.WithInputSchema[CreateTeamParams](),
+		mcp.WithOutputSchema[AdminTeamResult](),
+		mcp.WithTitleAnnotation("Create Team"),
+		mcp.WithDestructiveHintAnnotation(false),
+	), mcp.NewStructuredToolHandler(handleCreateTeam))
+
+	s.AddTool(mcp.NewTool("update_team",
+		mcp.WithDescription("Update an existing team's name and/or description. Requires team admin or global admin role."),
+		mcp.WithInputSchema[UpdateTeamParams](),
+		mcp.WithOutputSchema[AdminTeamResult](),
+		mcp.WithTitleAnnotation("Update Team"),
+		mcp.WithDestructiveHintAnnotation(false),
+	), mcp.NewStructuredToolHandler(handleUpdateTeam))
+
+	s.AddTool(mcp.NewTool("delete_team",
+		mcp.WithDescription("Delete a team permanently (admin only). Cannot be undone — removes all team associations."),
+		mcp.WithInputSchema[DeleteTeamParams](),
+		mcp.WithOutputSchema[SuccessResult](),
+		mcp.WithTitleAnnotation("Delete Team"),
+		mcp.WithDestructiveHintAnnotation(true),
+	), mcp.NewStructuredToolHandler(handleDeleteTeam))
+
+	s.AddTool(mcp.NewTool("list_team_members",
+		mcp.WithDescription("List all members of a specific team. Returns member details including roles and join dates."),
+		mcp.WithInputSchema[ListTeamMembersParams](),
+		mcp.WithOutputSchema[[]TeamMemberResult](),
+		mcp.WithTitleAnnotation("List Team Members"),
+		mcp.WithReadOnlyHintAnnotation(true),
+	), mcp.NewStructuredToolHandler(handleListTeamMembers))
+
+	s.AddTool(mcp.NewTool("add_team_member",
+		mcp.WithDescription("Add a user to a team with a specific role. Requires team admin or global admin. Valid roles: owner, admin, editor, member."),
+		mcp.WithInputSchema[AddTeamMemberParams](),
+		mcp.WithOutputSchema[SuccessResult](),
+		mcp.WithTitleAnnotation("Add Team Member"),
+		mcp.WithDestructiveHintAnnotation(false),
+	), mcp.NewStructuredToolHandler(handleAddTeamMember))
+
+	s.AddTool(mcp.NewTool("remove_team_member",
+		mcp.WithDescription("Remove a user from a team. Requires team admin or global admin. Revokes access to team resources."),
+		mcp.WithInputSchema[RemoveTeamMemberParams](),
+		mcp.WithOutputSchema[SuccessResult](),
+		mcp.WithTitleAnnotation("Remove Team Member"),
+		mcp.WithDestructiveHintAnnotation(true),
+	), mcp.NewStructuredToolHandler(handleRemoveTeamMember))
+
+	s.AddTool(mcp.NewTool("link_source_to_team",
+		mcp.WithDescription("Link a log source to a team, granting team members access. Requires team admin or global admin."),
+		mcp.WithInputSchema[LinkSourceToTeamParams](),
+		mcp.WithOutputSchema[SuccessResult](),
+		mcp.WithTitleAnnotation("Link Source to Team"),
+		mcp.WithDestructiveHintAnnotation(false),
+	), mcp.NewStructuredToolHandler(handleLinkSourceToTeam))
+
+	s.AddTool(mcp.NewTool("unlink_source_from_team",
+		mcp.WithDescription("Remove a log source from a team, revoking access. Requires team admin or global admin."),
+		mcp.WithInputSchema[UnlinkSourceFromTeamParams](),
+		mcp.WithOutputSchema[SuccessResult](),
+		mcp.WithTitleAnnotation("Unlink Source from Team"),
+		mcp.WithDestructiveHintAnnotation(true),
+	), mcp.NewStructuredToolHandler(handleUnlinkSourceFromTeam))
+
 	// User management tools (admin only)
-	ListAllUsers.Register(mcp)
-	GetUser.Register(mcp)
-	CreateUser.Register(mcp)
-	UpdateUser.Register(mcp)
-	DeleteUser.Register(mcp)
-	
+	s.AddTool(mcp.NewTool("list_all_users",
+		mcp.WithDescription("List all users in the system (admin only). Returns users with roles, status, and activity info."),
+		mcp.WithInputSchema[ListAllUsersParams](),
+		mcp.WithOutputSchema[[]AdminUserResult](),
+		mcp.WithTitleAnnotation("List All Users"),
+		mcp.WithReadOnlyHintAnnotation(true),
+	), mcp.NewStructuredToolHandler(handleListAllUsers))
+
+	s.AddTool(mcp.NewTool("get_user",
+		mcp.WithDescription("Get detailed user information by ID (admin only). Returns email, role, status, and timestamps."),
+		mcp.WithInputSchema[GetUserParams](),
+		mcp.WithOutputSchema[AdminUserResult](),
+		mcp.WithTitleAnnotation("Get User"),
+		mcp.WithReadOnlyHintAnnotation(true),
+	), mcp.NewStructuredToolHandler(handleGetUser))
+
+	s.AddTool(mcp.NewTool("create_user",
+		mcp.WithDescription("Create a new user (admin only). Provide email, full name, role (admin/member), and status (active/inactive)."),
+		mcp.WithInputSchema[CreateUserParams](),
+		mcp.WithOutputSchema[AdminUserResult](),
+		mcp.WithTitleAnnotation("Create User"),
+		mcp.WithDestructiveHintAnnotation(false),
+	), mcp.NewStructuredToolHandler(handleCreateUser))
+
+	s.AddTool(mcp.NewTool("update_user",
+		mcp.WithDescription("Update a user's information (admin only). All fields are optional — provide only fields to change."),
+		mcp.WithInputSchema[UpdateUserParams](),
+		mcp.WithOutputSchema[AdminUserResult](),
+		mcp.WithTitleAnnotation("Update User"),
+		mcp.WithDestructiveHintAnnotation(false),
+	), mcp.NewStructuredToolHandler(handleUpdateUser))
+
+	s.AddTool(mcp.NewTool("delete_user",
+		mcp.WithDescription("Delete a user permanently (admin only). Cannot be undone. Cannot delete the last admin user."),
+		mcp.WithInputSchema[DeleteUserParams](),
+		mcp.WithOutputSchema[SuccessResult](),
+		mcp.WithTitleAnnotation("Delete User"),
+		mcp.WithDestructiveHintAnnotation(true),
+	), mcp.NewStructuredToolHandler(handleDeleteUser))
+
 	// Source management tools (admin only)
-	ListAllSources.Register(mcp)
-	CreateSource.Register(mcp)
-	ValidateSourceConnection.Register(mcp)
-	DeleteSource.Register(mcp)
-	GetAdminSourceStats.Register(mcp)
-	
+	s.AddTool(mcp.NewTool("list_all_sources",
+		mcp.WithDescription("List all log sources in the system (admin only). Returns sources with connection details and metadata."),
+		mcp.WithInputSchema[ListAllSourcesParams](),
+		mcp.WithOutputSchema[[]SourceResult](),
+		mcp.WithTitleAnnotation("List All Sources"),
+		mcp.WithReadOnlyHintAnnotation(true),
+	), mcp.NewStructuredToolHandler(handleListAllSources))
+
+	s.AddTool(mcp.NewTool("create_source",
+		mcp.WithDescription("Create a new log source (admin only). Provide ClickHouse connection details, metadata config, and optional schema for auto-creation."),
+		mcp.WithInputSchema[CreateSourceParams](),
+		mcp.WithOutputSchema[SourceResult](),
+		mcp.WithTitleAnnotation("Create Source"),
+		mcp.WithDestructiveHintAnnotation(false),
+	), mcp.NewStructuredToolHandler(handleCreateSource))
+
+	s.AddTool(mcp.NewTool("validate_source_connection",
+		mcp.WithDescription("Validate ClickHouse connection details before creating a source (admin only). Tests connectivity and table existence."),
+		mcp.WithInputSchema[ValidateSourceConnectionParams](),
+		mcp.WithOutputSchema[ValidationResult](),
+		mcp.WithTitleAnnotation("Validate Source Connection"),
+		mcp.WithReadOnlyHintAnnotation(true),
+	), mcp.NewStructuredToolHandler(handleValidateSourceConnection))
+
+	s.AddTool(mcp.NewTool("delete_source",
+		mcp.WithDescription("Delete a log source permanently (admin only). Cannot be undone — removes all team associations."),
+		mcp.WithInputSchema[DeleteSourceParams](),
+		mcp.WithOutputSchema[SuccessResult](),
+		mcp.WithTitleAnnotation("Delete Source"),
+		mcp.WithDestructiveHintAnnotation(true),
+	), mcp.NewStructuredToolHandler(handleDeleteSource))
+
+	// Source stats uses typed handler (dynamic nested data)
+	s.AddTool(mcp.NewTool("get_admin_source_stats",
+		mcp.WithDescription("Get detailed statistics for a log source (admin only). Returns ClickHouse table stats including row count, sizes, compression ratio, and column statistics."),
+		mcp.WithInputSchema[GetAdminSourceStatsParams](),
+		mcp.WithTitleAnnotation("Get Source Statistics"),
+		mcp.WithReadOnlyHintAnnotation(true),
+	), mcp.NewTypedToolHandler(handleGetAdminSourceStats))
+
 	// API token management tools
-	ListAPITokens.Register(mcp)
-	CreateAPIToken.Register(mcp)
-	DeleteAPIToken.Register(mcp)
+	s.AddTool(mcp.NewTool("list_api_tokens",
+		mcp.WithDescription("List all API tokens for the current authenticated user. Returns token names, prefixes, last used, and expiration dates."),
+		mcp.WithInputSchema[ListAPITokensParams](),
+		mcp.WithOutputSchema[[]APITokenResult](),
+		mcp.WithTitleAnnotation("List API Tokens"),
+		mcp.WithReadOnlyHintAnnotation(true),
+	), mcp.NewStructuredToolHandler(handleListAPITokens))
+
+	s.AddTool(mcp.NewTool("create_api_token",
+		mcp.WithDescription("Create a new API token for the current user. Returns the full token value (only shown once) and metadata."),
+		mcp.WithInputSchema[CreateAPITokenParams](),
+		mcp.WithOutputSchema[APITokenCreateResult](),
+		mcp.WithTitleAnnotation("Create API Token"),
+		mcp.WithDestructiveHintAnnotation(false),
+	), mcp.NewStructuredToolHandler(handleCreateAPIToken))
+
+	s.AddTool(mcp.NewTool("delete_api_token",
+		mcp.WithDescription("Delete an API token. Immediately revokes access for any applications using it. Cannot be undone."),
+		mcp.WithInputSchema[DeleteAPITokenParams](),
+		mcp.WithOutputSchema[SuccessResult](),
+		mcp.WithTitleAnnotation("Delete API Token"),
+		mcp.WithDestructiveHintAnnotation(true),
+	), mcp.NewStructuredToolHandler(handleDeleteAPIToken))
 }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"time"
 )
 
@@ -1846,9 +1847,14 @@ type FieldValue struct {
 }
 
 func (c *Client) GetFieldValues(ctx context.Context, teamID, sourceID int, fieldName, fieldType, startTime, endTime string, limit int) (*FieldValuesResponse, error) {
-	url := fmt.Sprintf("%s/api/v1/teams/%d/sources/%d/fields/%s/values?type=%s&start_time=%s&end_time=%s&limit=%d",
-		c.config.BaseURL, teamID, sourceID, fieldName, fieldType, startTime, endTime, limit)
-	httpReq, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	baseURL := fmt.Sprintf("%s/api/v1/teams/%d/sources/%d/fields/%s/values",
+		c.config.BaseURL, teamID, sourceID, neturl.PathEscape(fieldName))
+	params := neturl.Values{}
+	params.Set("type", fieldType)
+	params.Set("start_time", startTime)
+	params.Set("end_time", endTime)
+	params.Set("limit", fmt.Sprintf("%d", limit))
+	httpReq, err := http.NewRequestWithContext(ctx, "GET", baseURL+"?"+params.Encode(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1992,4 +1998,122 @@ func (c *Client) GetAlertHistory(ctx context.Context, teamID, sourceID, alertID 
 		return nil, err
 	}
 	return &result, nil
+}
+
+// --- LogchefQL Validate ---
+
+type LogchefQLValidateRequest struct {
+	Query string `json:"query"`
+}
+
+type LogchefQLValidateResponse struct {
+	Status string `json:"status"`
+	Data   struct {
+		Valid bool   `json:"valid"`
+		Error string `json:"error,omitempty"`
+	} `json:"data"`
+}
+
+func (c *Client) ValidateLogchefQL(ctx context.Context, teamID, sourceID int, req LogchefQLValidateRequest) (*LogchefQLValidateResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/teams/%d/sources/%d/logchefql/validate", c.config.BaseURL, teamID, sourceID)
+	body, _ := json.Marshal(req)
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.config.APIKey))
+	httpReq.Header.Set("Content-Type", "application/json")
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(respBody))
+	}
+	var validateResult LogchefQLValidateResponse
+	if err := json.Unmarshal(respBody, &validateResult); err != nil {
+		return nil, err
+	}
+	return &validateResult, nil
+}
+
+// --- Generate AI SQL ---
+
+type GenerateSQLRequest struct {
+	NaturalLanguageQuery string `json:"natural_language_query"`
+}
+
+type GenerateSQLResponse struct {
+	Status string `json:"status"`
+	Data   struct {
+		SQLQuery string `json:"sql_query"`
+	} `json:"data"`
+}
+
+func (c *Client) GenerateAISQL(ctx context.Context, teamID, sourceID int, req GenerateSQLRequest) (*GenerateSQLResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/teams/%d/sources/%d/generate-sql", c.config.BaseURL, teamID, sourceID)
+	body, _ := json.Marshal(req)
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.config.APIKey))
+	httpReq.Header.Set("Content-Type", "application/json")
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(respBody))
+	}
+	var genResult GenerateSQLResponse
+	if err := json.Unmarshal(respBody, &genResult); err != nil {
+		return nil, err
+	}
+	return &genResult, nil
+}
+
+// --- Bulk Field Values ---
+
+type AllFieldValuesResponse struct {
+	Status string `json:"status"`
+	Data   any    `json:"data"`
+}
+
+func (c *Client) GetAllFieldValues(ctx context.Context, teamID, sourceID int, startTime, endTime, timezone string, limit int) (*AllFieldValuesResponse, error) {
+	baseURL := fmt.Sprintf("%s/api/v1/teams/%d/sources/%d/fields/values",
+		c.config.BaseURL, teamID, sourceID)
+	params := neturl.Values{}
+	params.Set("start_time", startTime)
+	params.Set("end_time", endTime)
+	if timezone != "" {
+		params.Set("timezone", timezone)
+	}
+	if limit > 0 {
+		params.Set("limit", fmt.Sprintf("%d", limit))
+	}
+	httpReq, err := http.NewRequestWithContext(ctx, "GET", baseURL+"?"+params.Encode(), nil)
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.config.APIKey))
+	httpReq.Header.Set("Content-Type", "application/json")
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(respBody))
+	}
+	var allFieldsResult AllFieldValuesResponse
+	if err := json.Unmarshal(respBody, &allFieldsResult); err != nil {
+		return nil, err
+	}
+	return &allFieldsResult, nil
 }

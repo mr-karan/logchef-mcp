@@ -35,44 +35,58 @@ Use the `--disable-<category>` flag to turn off tool categories you don't need. 
 
 ### Tools
 
-| Tool                           | Category | Description                                                                                          |
-| ------------------------------ | -------- | ---------------------------------------------------------------------------------------------------- |
-| `get_profile`                  | Profile  | Get the current user profile information                                                             |
-| `get_teams`                    | Profile  | Get teams that the current user belongs to                                                           |
-| `get_meta`                     | Profile  | Get server metadata including version information                                                    |
-| `get_sources`                  | Sources  | Get all sources accessible to the user across all team memberships                                  |
-| `get_team_sources`             | Sources  | Get sources that belong to a specific team                                                           |
-| `query_logs`                   | Logs     | Execute ClickHouse SQL queries against log sources to retrieve log entries                          |
-| `get_source_schema`            | Logs     | Get the ClickHouse table schema (column names and types) for a specific source                      |
-| `get_log_histogram`            | Logs     | Generate histogram data for logs with customizable time windows and grouping                        |
-| `get_collections`              | Logs     | List saved query collections for a specific team and source                                         |
-| `create_collection`            | Logs     | Create a new saved query collection                                                                  |
-| `get_collection`               | Logs     | Get details of a specific saved query collection                                                     |
-| `update_collection`            | Logs     | Update an existing saved query collection                                                            |
-| `delete_collection`            | Logs     | Delete a saved query collection                                                                      |
-| `list_all_teams`               | Admin    | List all teams in the system (admin only)                                                           |
-| `get_team`                     | Admin    | Get detailed information about a specific team                                                       |
-| `create_team`                  | Admin    | Create a new team (admin only)                                                                       |
-| `update_team`                  | Admin    | Update an existing team's information                                                                |
-| `delete_team`                  | Admin    | Delete a team permanently (admin only)                                                              |
-| `list_team_members`            | Admin    | List all members of a specific team                                                                  |
-| `add_team_member`              | Admin    | Add a user to a team with a specific role                                                           |
-| `remove_team_member`           | Admin    | Remove a user from a team                                                                            |
-| `link_source_to_team`          | Admin    | Link a log source to a team                                                                          |
-| `unlink_source_from_team`      | Admin    | Remove a log source from a team                                                                      |
-| `list_all_users`               | Admin    | List all users in the system (admin only)                                                           |
-| `get_user`                     | Admin    | Get detailed information about a specific user (admin only)                                         |
-| `create_user`                  | Admin    | Create a new user in the system (admin only)                                                        |
-| `update_user`                  | Admin    | Update an existing user's information (admin only)                                                  |
-| `delete_user`                  | Admin    | Delete a user from the system (admin only)                                                          |
-| `list_api_tokens`              | Admin    | List all API tokens for the current user                                                            |
-| `create_api_token`             | Admin    | Create a new API token for the current user                                                         |
-| `delete_api_token`             | Admin    | Delete an API token                                                                                  |
-| `list_all_sources`             | Admin    | List all log sources in the system (admin only)                                                     |
-| `create_source`                | Admin    | Create a new log source (admin only)                                                                |
-| `validate_source_connection`   | Admin    | Validate ClickHouse connection details (admin only)                                                 |
-| `delete_source`                | Admin    | Delete a log source (admin only)                                                                    |
-| `get_admin_source_stats`       | Admin    | Get detailed statistics for a log source (admin only)                                               |
+See [docs/tools.md](docs/tools.md) for the full reference including resources, prompts, and annotations.
+
+| Tool | Category | Description |
+|------|----------|-------------|
+| `get_profile` | Profile | Get current user profile |
+| `get_teams` | Profile | List teams you belong to |
+| `get_meta` | Profile | Server version and config |
+| `get_sources` | Sources | All accessible sources across teams |
+| `get_team_sources` | Sources | Sources for a specific team |
+| `query_logs` | Logs | Execute ClickHouse SQL (max 100 rows) |
+| `get_source_schema` | Logs | Column names and types for a source |
+| `get_log_histogram` | Logs | Time-series histogram with optional grouping |
+| `get_collections` | Logs | List saved query collections |
+| `create_collection` | Logs | Save a new query |
+| `get_collection` | Logs | Get a saved query by ID |
+| `update_collection` | Logs | Update a saved query |
+| `delete_collection` | Logs | Delete a saved query |
+| `query_logchefql` | LogchefQL | Execute LogchefQL query (max 500 rows) |
+| `translate_logchefql` | LogchefQL | Translate LogchefQL to SQL |
+| `validate_logchefql` | LogchefQL | Validate LogchefQL syntax |
+| `get_field_values` | Investigate | Top values for a field in a time range |
+| `get_log_context` | Investigate | Surrounding logs around a timestamp |
+| `list_alerts` | Investigate | Alert rules for a source |
+| `get_alert_history` | Investigate | Alert evaluation history |
+| `compare_windows` | Analysis | Compare query results across two time windows |
+| `top_values` | Analysis | Top values for multiple fields in one call |
+| `generate_query` | Discover | Natural language to SQL (requires AI enabled) |
+| `get_all_field_dimensions` | Discover | Bulk field values for all LowCardinality fields |
+| `get_query_telemetry` | Telemetry | Query performance from system.query_log |
+| `list_all_teams` | Admin | List all teams (admin only) |
+| `get_team` | Admin | Get team details |
+| `create_team` | Admin | Create a team (admin only) |
+| `update_team` | Admin | Update team info |
+| `delete_team` | Admin | Delete a team (admin only) |
+| `list_team_members` | Admin | List team members |
+| `add_team_member` | Admin | Add user to team |
+| `remove_team_member` | Admin | Remove user from team |
+| `link_source_to_team` | Admin | Grant team access to a source |
+| `unlink_source_from_team` | Admin | Revoke team access to a source |
+| `list_all_users` | Admin | List all users (admin only) |
+| `get_user` | Admin | Get user details (admin only) |
+| `create_user` | Admin | Create a user (admin only) |
+| `update_user` | Admin | Update user info (admin only) |
+| `delete_user` | Admin | Delete a user (admin only) |
+| `list_api_tokens` | Admin | List your API tokens |
+| `create_api_token` | Admin | Create an API token |
+| `delete_api_token` | Admin | Delete an API token |
+| `list_all_sources` | Admin | List all sources (admin only) |
+| `create_source` | Admin | Create a source (admin only) |
+| `validate_source_connection` | Admin | Test ClickHouse connectivity (admin only) |
+| `delete_source` | Admin | Delete a source (admin only) |
+| `get_admin_source_stats` | Admin | Source table stats (admin only) |
 
 ## Getting Started
 
@@ -300,11 +314,16 @@ To use debug mode with the Claude Desktop configuration, update your config as f
 
 You can selectively enable or disable tool categories using command-line flags:
 
-- `--enabled-tools`: Comma-separated list of tool categories to enable (default: "profile,sources,logs,admin")
+- `--enabled-tools`: Comma-separated list of tool categories to enable (default: all)
 - `--disable-profile`: Disable profile management tools
 - `--disable-sources`: Disable source management tools  
 - `--disable-logs`: Disable log querying tools
+- `--disable-logchefql`: Disable LogchefQL tools
+- `--disable-investigate`: Disable investigation tools
 - `--disable-admin`: Disable admin tools
+- `--disable-analysis`: Disable analysis tools (compare_windows, top_values)
+- `--disable-telemetry`: Disable telemetry tools
+- `--disable-discover`: Disable discovery tools (AI query generation, field dimensions)
 
 Example with selective tool enabling:
 
