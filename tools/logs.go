@@ -37,38 +37,32 @@ type GetLogHistogramParams struct {
 	QueryTimeout *int   `json:"query_timeout,omitempty" jsonschema:"Query timeout in seconds (default 30)"`
 }
 
-type GetCollectionsParams struct {
-	TeamID   int `json:"team_id" jsonschema:"The ID of the team that has access to the source"`
-	SourceID int `json:"source_id" jsonschema:"The ID of the source to get collections for"`
+type ListSavedQueriesParams struct {
+	SourceID int `json:"source_id,omitempty" jsonschema:"Optional source ID to filter by. Omit to list every saved query visible to the caller."`
 }
 
-type CreateCollectionParams struct {
-	TeamID      int    `json:"team_id" jsonschema:"The ID of the team that has access to the source"`
-	SourceID    int    `json:"source_id" jsonschema:"The ID of the source to create the collection for"`
-	Name        string `json:"name" jsonschema:"Name of the collection"`
-	Description string `json:"description,omitempty" jsonschema:"Optional description of the collection"`
-	Query       string `json:"query" jsonschema:"The ClickHouse SQL query to save in the collection"`
+type CreateSavedQueryParams struct {
+	SourceID     int    `json:"source_id" jsonschema:"The ID of the source the saved query runs against"`
+	Name         string `json:"name" jsonschema:"Name of the saved query"`
+	Description  string `json:"description,omitempty" jsonschema:"Optional description of the saved query"`
+	QueryType    string `json:"query_type" jsonschema:"Either 'logchefql' or 'sql'"`
+	QueryContent string `json:"query_content" jsonschema:"The query payload. JSON envelope containing version, sourceId, timeRange, limit, and content."`
 }
 
-type GetCollectionParams struct {
-	TeamID       int `json:"team_id" jsonschema:"The ID of the team that has access to the source"`
-	SourceID     int `json:"source_id" jsonschema:"The ID of the source that contains the collection"`
-	CollectionID int `json:"collection_id" jsonschema:"The ID of the collection to retrieve"`
+type GetSavedQueryParams struct {
+	QueryID int `json:"query_id" jsonschema:"The ID of the saved query to retrieve"`
 }
 
-type UpdateCollectionParams struct {
-	TeamID       int    `json:"team_id" jsonschema:"The ID of the team that has access to the source"`
-	SourceID     int    `json:"source_id" jsonschema:"The ID of the source that contains the collection"`
-	CollectionID int    `json:"collection_id" jsonschema:"The ID of the collection to update"`
-	Name         string `json:"name" jsonschema:"Name of the collection"`
-	Description  string `json:"description,omitempty" jsonschema:"Optional description of the collection"`
-	Query        string `json:"query" jsonschema:"The ClickHouse SQL query to save in the collection"`
+type UpdateSavedQueryParams struct {
+	QueryID      int    `json:"query_id" jsonschema:"The ID of the saved query to update"`
+	Name         string `json:"name" jsonschema:"Name of the saved query"`
+	Description  string `json:"description,omitempty" jsonschema:"Optional description of the saved query"`
+	QueryType    string `json:"query_type" jsonschema:"Either 'logchefql' or 'sql'"`
+	QueryContent string `json:"query_content" jsonschema:"The query payload. JSON envelope containing version, sourceId, timeRange, limit, and content."`
 }
 
-type DeleteCollectionParams struct {
-	TeamID       int `json:"team_id" jsonschema:"The ID of the team that has access to the source"`
-	SourceID     int `json:"source_id" jsonschema:"The ID of the source that contains the collection"`
-	CollectionID int `json:"collection_id" jsonschema:"The ID of the collection to delete"`
+type DeleteSavedQueryParams struct {
+	QueryID int `json:"query_id" jsonschema:"The ID of the saved query to delete"`
 }
 
 // --- Output schemas ---
@@ -78,15 +72,18 @@ type SchemaColumnResult struct {
 	Type string `json:"type" jsonschema:"ClickHouse column type"`
 }
 
-type CollectionResult struct {
-	ID          int    `json:"id" jsonschema:"Collection ID"`
-	Name        string `json:"name" jsonschema:"Collection name"`
-	Description string `json:"description" jsonschema:"Collection description"`
-	TeamID      int    `json:"team_id" jsonschema:"Team ID"`
-	SourceID    int    `json:"source_id" jsonschema:"Source ID"`
-	Query       string `json:"query" jsonschema:"Saved ClickHouse SQL query"`
-	CreatedAt   string `json:"created_at" jsonschema:"Creation timestamp"`
-	UpdatedAt   string `json:"updated_at" jsonschema:"Last update timestamp"`
+type SavedQueryResult struct {
+	ID                int    `json:"id" jsonschema:"Saved query ID"`
+	Name              string `json:"name" jsonschema:"Saved query name"`
+	Description       string `json:"description" jsonschema:"Saved query description"`
+	SourceID          int    `json:"source_id" jsonschema:"ID of the source the query runs against"`
+	CreatedFromTeamID *int   `json:"created_from_team_id,omitempty" jsonschema:"Team the query was originally saved from (resolver preference hint, not an ACL)"`
+	QueryType         string `json:"query_type" jsonschema:"Either 'logchefql' or 'sql'"`
+	QueryContent      string `json:"query_content" jsonschema:"Query payload (JSON envelope)"`
+	CreatedBy         *int   `json:"created_by,omitempty" jsonschema:"Creator user ID; null on legacy queries"`
+	SourceName        string `json:"source_name,omitempty" jsonschema:"Human-readable source name (when included)"`
+	CreatedAt         string `json:"created_at" jsonschema:"Creation timestamp"`
+	UpdatedAt         string `json:"updated_at" jsonschema:"Last update timestamp"`
 }
 
 type SuccessResult struct {
@@ -163,88 +160,103 @@ func handleGetLogHistogram(ctx context.Context, request mcp.CallToolRequest, arg
 	return mcp.NewToolResultText(string(out)), nil
 }
 
-func handleGetCollections(ctx context.Context, request mcp.CallToolRequest, args GetCollectionsParams) ([]CollectionResult, error) {
+func handleListSavedQueries(ctx context.Context, request mcp.CallToolRequest, args ListSavedQueriesParams) ([]SavedQueryResult, error) {
 	c := mcplogchef.LogchefClientFromContext(ctx)
 	if c == nil {
 		return nil, fmt.Errorf("logchef client not configured")
 	}
 
-	collections, err := c.GetCollections(ctx, args.TeamID, args.SourceID)
+	queries, err := c.ListSavedQueries(ctx, args.SourceID)
 	if err != nil {
-		return nil, fmt.Errorf("get collections: %w", err)
+		return nil, fmt.Errorf("list saved queries: %w", err)
 	}
 
-	result := make([]CollectionResult, len(collections.Data))
-	for i, col := range collections.Data {
-		result[i] = collectionToResult(col)
+	result := make([]SavedQueryResult, len(queries.Data))
+	for i, q := range queries.Data {
+		result[i] = savedQueryToResult(q)
 	}
 	return result, nil
 }
 
-func handleCreateCollection(ctx context.Context, request mcp.CallToolRequest, args CreateCollectionParams) (CollectionResult, error) {
+func handleCreateSavedQuery(ctx context.Context, request mcp.CallToolRequest, args CreateSavedQueryParams) (SavedQueryResult, error) {
 	c := mcplogchef.LogchefClientFromContext(ctx)
 	if c == nil {
-		return CollectionResult{}, fmt.Errorf("logchef client not configured")
+		return SavedQueryResult{}, fmt.Errorf("logchef client not configured")
 	}
 
-	collection, err := c.CreateCollection(ctx, args.TeamID, args.SourceID, client.CollectionRequest{
-		Name: args.Name, Description: args.Description, Query: args.Query,
+	created, err := c.CreateSavedQuery(ctx, client.CreateSavedQueryRequest{
+		Name:         args.Name,
+		Description:  args.Description,
+		SourceID:     args.SourceID,
+		QueryType:    args.QueryType,
+		QueryContent: args.QueryContent,
 	})
 	if err != nil {
-		return CollectionResult{}, fmt.Errorf("create collection: %w", err)
+		return SavedQueryResult{}, fmt.Errorf("create saved query: %w", err)
 	}
 
-	return collectionToResult(collection.Data), nil
+	return savedQueryToResult(created.Data), nil
 }
 
-func handleGetCollection(ctx context.Context, request mcp.CallToolRequest, args GetCollectionParams) (CollectionResult, error) {
+func handleGetSavedQuery(ctx context.Context, request mcp.CallToolRequest, args GetSavedQueryParams) (SavedQueryResult, error) {
 	c := mcplogchef.LogchefClientFromContext(ctx)
 	if c == nil {
-		return CollectionResult{}, fmt.Errorf("logchef client not configured")
+		return SavedQueryResult{}, fmt.Errorf("logchef client not configured")
 	}
 
-	collection, err := c.GetCollection(ctx, args.TeamID, args.SourceID, args.CollectionID)
+	got, err := c.GetSavedQuery(ctx, args.QueryID)
 	if err != nil {
-		return CollectionResult{}, fmt.Errorf("get collection: %w", err)
+		return SavedQueryResult{}, fmt.Errorf("get saved query: %w", err)
 	}
 
-	return collectionToResult(collection.Data), nil
+	return savedQueryToResult(got.Data), nil
 }
 
-func handleUpdateCollection(ctx context.Context, request mcp.CallToolRequest, args UpdateCollectionParams) (CollectionResult, error) {
+func handleUpdateSavedQuery(ctx context.Context, request mcp.CallToolRequest, args UpdateSavedQueryParams) (SavedQueryResult, error) {
 	c := mcplogchef.LogchefClientFromContext(ctx)
 	if c == nil {
-		return CollectionResult{}, fmt.Errorf("logchef client not configured")
+		return SavedQueryResult{}, fmt.Errorf("logchef client not configured")
 	}
 
-	collection, err := c.UpdateCollection(ctx, args.TeamID, args.SourceID, args.CollectionID, client.CollectionRequest{
-		Name: args.Name, Description: args.Description, Query: args.Query,
+	updated, err := c.UpdateSavedQuery(ctx, args.QueryID, client.UpdateSavedQueryRequest{
+		Name:         args.Name,
+		Description:  args.Description,
+		QueryType:    args.QueryType,
+		QueryContent: args.QueryContent,
 	})
 	if err != nil {
-		return CollectionResult{}, fmt.Errorf("update collection: %w", err)
+		return SavedQueryResult{}, fmt.Errorf("update saved query: %w", err)
 	}
 
-	return collectionToResult(collection.Data), nil
+	return savedQueryToResult(updated.Data), nil
 }
 
-func handleDeleteCollection(ctx context.Context, request mcp.CallToolRequest, args DeleteCollectionParams) (SuccessResult, error) {
+func handleDeleteSavedQuery(ctx context.Context, request mcp.CallToolRequest, args DeleteSavedQueryParams) (SuccessResult, error) {
 	c := mcplogchef.LogchefClientFromContext(ctx)
 	if c == nil {
 		return SuccessResult{}, fmt.Errorf("logchef client not configured")
 	}
 
-	if err := c.DeleteCollection(ctx, args.TeamID, args.SourceID, args.CollectionID); err != nil {
-		return SuccessResult{}, fmt.Errorf("delete collection: %w", err)
+	if err := c.DeleteSavedQuery(ctx, args.QueryID); err != nil {
+		return SuccessResult{}, fmt.Errorf("delete saved query: %w", err)
 	}
 
-	return SuccessResult{Success: true, Message: "Collection deleted successfully"}, nil
+	return SuccessResult{Success: true, Message: "Saved query deleted successfully"}, nil
 }
 
-func collectionToResult(c client.Collection) CollectionResult {
-	return CollectionResult{
-		ID: c.ID, Name: c.Name, Description: c.Description,
-		TeamID: c.TeamID, SourceID: c.SourceID, Query: c.Query,
-		CreatedAt: c.CreatedAt, UpdatedAt: c.UpdatedAt,
+func savedQueryToResult(q client.SavedQuery) SavedQueryResult {
+	return SavedQueryResult{
+		ID:                q.ID,
+		Name:              q.Name,
+		Description:       q.Description,
+		SourceID:          q.SourceID,
+		CreatedFromTeamID: q.CreatedFromTeamID,
+		QueryType:         q.QueryType,
+		QueryContent:      q.QueryContent,
+		CreatedBy:         q.CreatedBy,
+		SourceName:        q.SourceName,
+		CreatedAt:         q.CreatedAt,
+		UpdatedAt:         q.UpdatedAt,
 	}
 }
 
@@ -276,48 +288,48 @@ func AddLogsTools(s *server.MCPServer) {
 	)
 	s.AddTool(histogramTool, mcp.NewTypedToolHandler(handleGetLogHistogram))
 
-	getCollectionsTool := mcp.NewTool("get_collections",
-		mcp.WithDescription("Get all saved query collections for a specific team and source. Collections are saved queries that can be reused for common log analysis patterns."),
-		mcp.WithInputSchema[GetCollectionsParams](),
-		mcp.WithOutputSchema[[]CollectionResult](),
-		mcp.WithTitleAnnotation("Get Collections"),
+	listSavedQueriesTool := mcp.NewTool("list_saved_queries",
+		mcp.WithDescription("List saved queries visible to the caller. Optionally filter by source_id. Saved queries are reusable LogchefQL or SQL queries pinned to a specific source; any user with source access via any team can see them."),
+		mcp.WithInputSchema[ListSavedQueriesParams](),
+		mcp.WithOutputSchema[[]SavedQueryResult](),
+		mcp.WithTitleAnnotation("List Saved Queries"),
 		mcp.WithReadOnlyHintAnnotation(true),
 	)
-	s.AddTool(getCollectionsTool, mcp.NewStructuredToolHandler(handleGetCollections))
+	s.AddTool(listSavedQueriesTool, mcp.NewStructuredToolHandler(handleListSavedQueries))
 
-	createCollectionTool := mcp.NewTool("create_collection",
-		mcp.WithDescription("Create a new saved query collection for a specific team and source. Provide a name, optional description, and the ClickHouse SQL query to save."),
-		mcp.WithInputSchema[CreateCollectionParams](),
-		mcp.WithOutputSchema[CollectionResult](),
-		mcp.WithTitleAnnotation("Create Collection"),
+	createSavedQueryTool := mcp.NewTool("create_saved_query",
+		mcp.WithDescription("Create a new saved query bound to a source. Provide source_id, name, query_type ('logchefql' or 'sql'), and query_content (a JSON envelope with version, sourceId, timeRange, limit, and the query text)."),
+		mcp.WithInputSchema[CreateSavedQueryParams](),
+		mcp.WithOutputSchema[SavedQueryResult](),
+		mcp.WithTitleAnnotation("Create Saved Query"),
 		mcp.WithDestructiveHintAnnotation(false),
 	)
-	s.AddTool(createCollectionTool, mcp.NewStructuredToolHandler(handleCreateCollection))
+	s.AddTool(createSavedQueryTool, mcp.NewStructuredToolHandler(handleCreateSavedQuery))
 
-	getCollectionTool := mcp.NewTool("get_collection",
-		mcp.WithDescription("Get a specific saved query collection by ID. Returns the collection details including name, description, query, and metadata."),
-		mcp.WithInputSchema[GetCollectionParams](),
-		mcp.WithOutputSchema[CollectionResult](),
-		mcp.WithTitleAnnotation("Get Collection"),
+	getSavedQueryTool := mcp.NewTool("get_saved_query",
+		mcp.WithDescription("Get a single saved query by ID. Returns name, description, query_type, query_content, source, and metadata."),
+		mcp.WithInputSchema[GetSavedQueryParams](),
+		mcp.WithOutputSchema[SavedQueryResult](),
+		mcp.WithTitleAnnotation("Get Saved Query"),
 		mcp.WithReadOnlyHintAnnotation(true),
 	)
-	s.AddTool(getCollectionTool, mcp.NewStructuredToolHandler(handleGetCollection))
+	s.AddTool(getSavedQueryTool, mcp.NewStructuredToolHandler(handleGetSavedQuery))
 
-	updateCollectionTool := mcp.NewTool("update_collection",
-		mcp.WithDescription("Update an existing saved query collection. All fields are required - provide the current values for fields you don't want to change."),
-		mcp.WithInputSchema[UpdateCollectionParams](),
-		mcp.WithOutputSchema[CollectionResult](),
-		mcp.WithTitleAnnotation("Update Collection"),
+	updateSavedQueryTool := mcp.NewTool("update_saved_query",
+		mcp.WithDescription("Update an existing saved query. Only the creator (or a global admin) can update. The source cannot be changed — create a new query if you need to retarget."),
+		mcp.WithInputSchema[UpdateSavedQueryParams](),
+		mcp.WithOutputSchema[SavedQueryResult](),
+		mcp.WithTitleAnnotation("Update Saved Query"),
 		mcp.WithDestructiveHintAnnotation(false),
 	)
-	s.AddTool(updateCollectionTool, mcp.NewStructuredToolHandler(handleUpdateCollection))
+	s.AddTool(updateSavedQueryTool, mcp.NewStructuredToolHandler(handleUpdateSavedQuery))
 
-	deleteCollectionTool := mcp.NewTool("delete_collection",
-		mcp.WithDescription("Delete a saved query collection by ID. This permanently removes the collection and cannot be undone."),
-		mcp.WithInputSchema[DeleteCollectionParams](),
+	deleteSavedQueryTool := mcp.NewTool("delete_saved_query",
+		mcp.WithDescription("Delete a saved query by ID. Only the creator (or a global admin) can delete. Permanent."),
+		mcp.WithInputSchema[DeleteSavedQueryParams](),
 		mcp.WithOutputSchema[SuccessResult](),
-		mcp.WithTitleAnnotation("Delete Collection"),
+		mcp.WithTitleAnnotation("Delete Saved Query"),
 		mcp.WithDestructiveHintAnnotation(true),
 	)
-	s.AddTool(deleteCollectionTool, mcp.NewStructuredToolHandler(handleDeleteCollection))
+	s.AddTool(deleteSavedQueryTool, mcp.NewStructuredToolHandler(handleDeleteSavedQuery))
 }

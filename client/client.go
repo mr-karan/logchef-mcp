@@ -207,35 +207,55 @@ type SourceStatsResponse struct {
 	} `json:"data"`
 }
 
-// Collection represents a saved query collection
-type Collection struct {
-	ID          int    `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	TeamID      int    `json:"team_id"`
-	SourceID    int    `json:"source_id"`
-	Query       string `json:"query"`
-	CreatedAt   string `json:"created_at"`
-	UpdatedAt   string `json:"updated_at"`
+// SavedQuery represents a saved query, source-scoped (logchef v1.6.0+).
+//
+// Saved queries used to be team-scoped ("collections" in the old API). In
+// v1.6.0 they were rebuilt as source-scoped: any team member with access to
+// the source can see them. `CreatedFromTeamID` is a hint for the resolver,
+// not an ACL.
+type SavedQuery struct {
+	ID                int    `json:"id"`
+	SourceID          int    `json:"source_id"`
+	CreatedFromTeamID *int   `json:"created_from_team_id,omitempty"`
+	Name              string `json:"name"`
+	Description       string `json:"description"`
+	QueryType         string `json:"query_type"`    // "logchefql" or "sql"
+	QueryContent      string `json:"query_content"` // JSON envelope: see logchef SavedQueryContent
+	CreatedBy         *int   `json:"created_by,omitempty"`
+	CreatedAt         string `json:"created_at"`
+	UpdatedAt         string `json:"updated_at"`
+	SourceName        string `json:"source_name,omitempty"`
 }
 
-// CollectionRequest represents the request body for creating/updating collections
-type CollectionRequest struct {
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-	Query       string `json:"query"`
+// CreateSavedQueryRequest is the body for POST /api/v1/saved-queries.
+type CreateSavedQueryRequest struct {
+	Name              string `json:"name"`
+	Description       string `json:"description,omitempty"`
+	SourceID          int    `json:"source_id"`
+	CreatedFromTeamID *int   `json:"created_from_team_id,omitempty"`
+	QueryType         string `json:"query_type"`    // "logchefql" or "sql"
+	QueryContent      string `json:"query_content"` // JSON envelope
 }
 
-// CollectionsResponse represents the response from the collections list endpoint
-type CollectionsResponse struct {
+// UpdateSavedQueryRequest is the body for PUT /api/v1/saved-queries/:id.
+// SourceID is intentionally not updatable.
+type UpdateSavedQueryRequest struct {
+	Name         string `json:"name"`
+	Description  string `json:"description,omitempty"`
+	QueryType    string `json:"query_type"`
+	QueryContent string `json:"query_content"`
+}
+
+// SavedQueriesResponse is the list-endpoint envelope.
+type SavedQueriesResponse struct {
 	Status string       `json:"status"`
-	Data   []Collection `json:"data"`
+	Data   []SavedQuery `json:"data"`
 }
 
-// CollectionResponse represents the response from single collection endpoints
-type CollectionResponse struct {
+// SavedQueryResponse is the single-item endpoint envelope.
+type SavedQueryResponse struct {
 	Status string     `json:"status"`
-	Data   Collection `json:"data"`
+	Data   SavedQuery `json:"data"`
 }
 
 // Team represents a team in the admin API
@@ -761,9 +781,14 @@ func (c *Client) GetLogHistogram(ctx context.Context, teamID, sourceID int, requ
 	return &histogram, nil
 }
 
-// GetCollections retrieves all collections for a specific team and source
-func (c *Client) GetCollections(ctx context.Context, teamID, sourceID int) (*CollectionsResponse, error) {
-	url := fmt.Sprintf("%s/api/v1/teams/%d/sources/%d/collections", c.config.BaseURL, teamID, sourceID)
+// ListSavedQueries lists saved queries the caller can see. When sourceID > 0,
+// the list is filtered to that source (`?source_id=`); otherwise every visible
+// saved query is returned.
+func (c *Client) ListSavedQueries(ctx context.Context, sourceID int) (*SavedQueriesResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/saved-queries", c.config.BaseURL)
+	if sourceID > 0 {
+		url = fmt.Sprintf("%s?source_id=%d", url, sourceID)
+	}
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -789,17 +814,18 @@ func (c *Client) GetCollections(ctx context.Context, teamID, sourceID int) (*Col
 		return nil, fmt.Errorf("read response body: %w", err)
 	}
 
-	var collections CollectionsResponse
-	if err := json.Unmarshal(body, &collections); err != nil {
+	var result SavedQueriesResponse
+	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("unmarshal response: %w", err)
 	}
 
-	return &collections, nil
+	return &result, nil
 }
 
-// CreateCollection creates a new collection for a specific team and source
-func (c *Client) CreateCollection(ctx context.Context, teamID, sourceID int, request CollectionRequest) (*CollectionResponse, error) {
-	url := fmt.Sprintf("%s/api/v1/teams/%d/sources/%d/collections", c.config.BaseURL, teamID, sourceID)
+// CreateSavedQuery creates a new saved query bound to a source. The caller
+// must have source access via any of their teams.
+func (c *Client) CreateSavedQuery(ctx context.Context, request CreateSavedQueryRequest) (*SavedQueryResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/saved-queries", c.config.BaseURL)
 
 	requestBody, err := json.Marshal(request)
 	if err != nil {
@@ -830,17 +856,17 @@ func (c *Client) CreateCollection(ctx context.Context, teamID, sourceID int, req
 		return nil, fmt.Errorf("read response body: %w", err)
 	}
 
-	var collection CollectionResponse
-	if err := json.Unmarshal(body, &collection); err != nil {
+	var result SavedQueryResponse
+	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("unmarshal response: %w", err)
 	}
 
-	return &collection, nil
+	return &result, nil
 }
 
-// GetCollection retrieves a specific collection by ID
-func (c *Client) GetCollection(ctx context.Context, teamID, sourceID, collectionID int) (*CollectionResponse, error) {
-	url := fmt.Sprintf("%s/api/v1/teams/%d/sources/%d/collections/%d", c.config.BaseURL, teamID, sourceID, collectionID)
+// GetSavedQuery retrieves a single saved query by ID.
+func (c *Client) GetSavedQuery(ctx context.Context, queryID int) (*SavedQueryResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/saved-queries/%d", c.config.BaseURL, queryID)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -866,17 +892,18 @@ func (c *Client) GetCollection(ctx context.Context, teamID, sourceID, collection
 		return nil, fmt.Errorf("read response body: %w", err)
 	}
 
-	var collection CollectionResponse
-	if err := json.Unmarshal(body, &collection); err != nil {
+	var result SavedQueryResponse
+	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("unmarshal response: %w", err)
 	}
 
-	return &collection, nil
+	return &result, nil
 }
 
-// UpdateCollection updates an existing collection
-func (c *Client) UpdateCollection(ctx context.Context, teamID, sourceID, collectionID int, request CollectionRequest) (*CollectionResponse, error) {
-	url := fmt.Sprintf("%s/api/v1/teams/%d/sources/%d/collections/%d", c.config.BaseURL, teamID, sourceID, collectionID)
+// UpdateSavedQuery updates an existing saved query. Only the creator (or a
+// global admin) can update.
+func (c *Client) UpdateSavedQuery(ctx context.Context, queryID int, request UpdateSavedQueryRequest) (*SavedQueryResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/saved-queries/%d", c.config.BaseURL, queryID)
 
 	requestBody, err := json.Marshal(request)
 	if err != nil {
@@ -907,17 +934,18 @@ func (c *Client) UpdateCollection(ctx context.Context, teamID, sourceID, collect
 		return nil, fmt.Errorf("read response body: %w", err)
 	}
 
-	var collection CollectionResponse
-	if err := json.Unmarshal(body, &collection); err != nil {
+	var result SavedQueryResponse
+	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("unmarshal response: %w", err)
 	}
 
-	return &collection, nil
+	return &result, nil
 }
 
-// DeleteCollection deletes a collection by ID
-func (c *Client) DeleteCollection(ctx context.Context, teamID, sourceID, collectionID int) error {
-	url := fmt.Sprintf("%s/api/v1/teams/%d/sources/%d/collections/%d", c.config.BaseURL, teamID, sourceID, collectionID)
+// DeleteSavedQuery removes a saved query. Only the creator (or a global
+// admin) can delete.
+func (c *Client) DeleteSavedQuery(ctx context.Context, queryID int) error {
+	url := fmt.Sprintf("%s/api/v1/saved-queries/%d", c.config.BaseURL, queryID)
 
 	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
 	if err != nil {
@@ -933,7 +961,7 @@ func (c *Client) DeleteCollection(ctx context.Context, teamID, sourceID, collect
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusNoContent {
+	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
 	}
@@ -1952,8 +1980,14 @@ type AlertHistoryResponse struct {
 	Data   []AlertHistoryEntry `json:"data"`
 }
 
-func (c *Client) ListAlerts(ctx context.Context, teamID, sourceID int) (*AlertsListResponse, error) {
-	url := fmt.Sprintf("%s/api/v1/teams/%d/sources/%d/alerts", c.config.BaseURL, teamID, sourceID)
+// ListAlerts lists alerts visible to the caller. When sourceID > 0, the list
+// is filtered to that source (`?source_id=`). Alerts are no longer team-scoped
+// in logchef v1.6.0+.
+func (c *Client) ListAlerts(ctx context.Context, sourceID int) (*AlertsListResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/alerts", c.config.BaseURL)
+	if sourceID > 0 {
+		url = fmt.Sprintf("%s?source_id=%d", url, sourceID)
+	}
 	httpReq, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -1976,8 +2010,11 @@ func (c *Client) ListAlerts(ctx context.Context, teamID, sourceID int) (*AlertsL
 	return &result, nil
 }
 
-func (c *Client) GetAlertHistory(ctx context.Context, teamID, sourceID, alertID int) (*AlertHistoryResponse, error) {
-	url := fmt.Sprintf("%s/api/v1/teams/%d/sources/%d/alerts/%d/history", c.config.BaseURL, teamID, sourceID, alertID)
+// GetAlertHistory returns the evaluation history for a specific alert. Alerts
+// are no longer team-scoped in logchef v1.6.0+, so the lookup is by alertID
+// alone.
+func (c *Client) GetAlertHistory(ctx context.Context, alertID int) (*AlertHistoryResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/alerts/%d/history", c.config.BaseURL, alertID)
 	httpReq, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err

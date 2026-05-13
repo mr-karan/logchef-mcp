@@ -33,14 +33,11 @@ type GetLogContextParams struct {
 }
 
 type ListAlertsParams struct {
-	TeamID   int `json:"team_id" jsonschema:"Team ID"`
-	SourceID int `json:"source_id" jsonschema:"Source ID"`
+	SourceID int `json:"source_id,omitempty" jsonschema:"Optional source ID filter. Omit to list every alert visible to the caller."`
 }
 
 type GetAlertHistoryParams struct {
-	TeamID   int `json:"team_id" jsonschema:"Team ID"`
-	SourceID int `json:"source_id" jsonschema:"Source ID"`
-	AlertID  int `json:"alert_id" jsonschema:"Alert ID"`
+	AlertID int `json:"alert_id" jsonschema:"Alert ID"`
 }
 
 // --- Handlers ---
@@ -120,7 +117,7 @@ func handleListAlerts(ctx context.Context, request mcp.CallToolRequest, params L
 		return mcp.NewToolResultError("logchef client not configured"), nil
 	}
 
-	resp, err := lc.ListAlerts(ctx, params.TeamID, params.SourceID)
+	resp, err := lc.ListAlerts(ctx, params.SourceID)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("list alerts failed: %v", err)), nil
 	}
@@ -135,7 +132,7 @@ func handleGetAlertHistory(ctx context.Context, request mcp.CallToolRequest, par
 		return mcp.NewToolResultError("logchef client not configured"), nil
 	}
 
-	resp, err := lc.GetAlertHistory(ctx, params.TeamID, params.SourceID, params.AlertID)
+	resp, err := lc.GetAlertHistory(ctx, params.AlertID)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("get alert history failed: %v", err)), nil
 	}

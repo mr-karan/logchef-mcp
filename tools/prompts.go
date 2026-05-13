@@ -21,13 +21,15 @@ func AddPrompts(s *server.MCPServer) {
 		handleInvestigateErrorSpike,
 	)
 
-	// Investigate alert prompt
+	// Investigate alert prompt. Alerts are no longer team-scoped in logchef
+	// v1.6.0+ — only alert_id is needed. Source/team context is included as
+	// optional hints so the LLM can pivot to schema/log lookups when useful.
 	s.AddPrompt(
 		mcp.NewPrompt("investigate_alert",
 			mcp.WithPromptDescription("Guided investigation workflow for a specific alert. Reviews alert configuration, recent history, matches log patterns, and suggests remediation."),
-			mcp.WithArgument("team_id", mcp.RequiredArgument(), mcp.ArgumentDescription("Team ID that owns the source")),
-			mcp.WithArgument("source_id", mcp.RequiredArgument(), mcp.ArgumentDescription("Source ID the alert is configured on")),
 			mcp.WithArgument("alert_id", mcp.RequiredArgument(), mcp.ArgumentDescription("Alert ID to investigate")),
+			mcp.WithArgument("team_id", mcp.ArgumentDescription("Team ID to use for related schema/log lookups (optional)")),
+			mcp.WithArgument("source_id", mcp.ArgumentDescription("Source ID the alert is configured on (optional; helps schema/log lookups)")),
 		),
 		handleInvestigateAlert,
 	)
@@ -94,27 +96,27 @@ func handleInvestigateErrorSpike(ctx context.Context, request mcp.GetPromptReque
 }
 
 func handleInvestigateAlert(ctx context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+	alertID := request.Params.Arguments["alert_id"]
 	teamID := request.Params.Arguments["team_id"]
 	sourceID := request.Params.Arguments["source_id"]
-	alertID := request.Params.Arguments["alert_id"]
 
 	instructions := fmt.Sprintf(`You are investigating a specific alert in a Logchef log source.
 
 **Context:**
-- Team ID: %s
-- Source ID: %s
 - Alert ID: %s
+- Team ID (optional, for schema/log lookups): %s
+- Source ID (optional, for schema/log lookups): %s
 
 **Investigation Steps:**
 
-1. **Review Alert Configuration**: Use list_alerts (team_id=%s, source_id=%s) to find the alert details — its name, severity, query, threshold, and current state.
+1. **Review Alert Configuration**: Use list_alerts (optionally filtered by source_id=%s) to find the alert details — its name, severity, query, threshold, and current state.
 
-2. **Check Alert History**: Use get_alert_history (team_id=%s, source_id=%s, alert_id=%s) to see recent evaluation results:
+2. **Check Alert History**: Use get_alert_history (alert_id=%s) to see recent evaluation results:
    - When did it last fire?
    - How frequently has it been triggering?
    - Has it been flapping (firing/resolving repeatedly)?
 
-3. **Understand the Schema**: Use get_source_schema to understand available columns for deeper investigation.
+3. **Understand the Schema**: Use get_source_schema (team_id=%s, source_id=%s) to understand available columns for deeper investigation.
 
 4. **Reproduce the Alert Query**: Run the alert's query using query_logchefql or query_logs to see the actual matching logs. Examine:
    - Are the logs genuine errors or false positives?
@@ -125,16 +127,16 @@ func handleInvestigateAlert(ctx context.Context, request mcp.GetPromptRequest) (
    - Use get_field_values to explore related dimensions
    - Use get_log_histogram to visualize the pattern over time
 
-6. **Correlate**: Check if other alerts on this source are also firing (list_alerts). Look for common patterns.
+6. **Correlate**: Check if other alerts on this source are also firing (list_alerts with source_id=%s). Look for common patterns.
 
 7. **Summarize Findings**: Present:
    - Alert details and current state
    - Whether the alert is firing correctly or is a false positive
    - The underlying log pattern causing the alert
-   - Recommended actions (acknowledge, tune threshold, fix root cause, etc.)`, teamID, sourceID, alertID, teamID, sourceID, teamID, sourceID, alertID)
+   - Recommended actions (acknowledge, tune threshold, fix root cause, etc.)`, alertID, teamID, sourceID, sourceID, alertID, teamID, sourceID, sourceID)
 
 	return &mcp.GetPromptResult{
-		Description: fmt.Sprintf("Investigate alert %s in source %s (team %s)", alertID, sourceID, teamID),
+		Description: fmt.Sprintf("Investigate alert %s", alertID),
 		Messages: []mcp.PromptMessage{
 			{
 				Role: mcp.RoleUser,

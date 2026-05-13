@@ -12,7 +12,7 @@ With this MCP server, you can ask AI assistants to help you:
 - **Query logs effectively:** Execute ClickHouse SQL queries to find specific log entries, errors, or patterns
 - **Understand your data:** Get schema information to know what fields are available in your logs
 - **Analyze log patterns:** Generate histograms and time-series data for trend analysis
-- **Manage saved queries:** Create and organize collections of frequently-used queries
+- **Manage saved queries:** Create, browse, and update frequently-used queries pinned to a source
 - **Administer teams and users:** Handle team membership, user management, and source configuration (admin users)
 
 ## Tool Categories
@@ -47,11 +47,11 @@ See [docs/tools.md](docs/tools.md) for the full reference including resources, p
 | `query_logs` | Logs | Execute ClickHouse SQL (max 100 rows) |
 | `get_source_schema` | Logs | Column names and types for a source |
 | `get_log_histogram` | Logs | Time-series histogram with optional grouping |
-| `get_collections` | Logs | List saved query collections |
-| `create_collection` | Logs | Save a new query |
-| `get_collection` | Logs | Get a saved query by ID |
-| `update_collection` | Logs | Update a saved query |
-| `delete_collection` | Logs | Delete a saved query |
+| `list_saved_queries` | Logs | List saved queries (optionally filtered by `source_id`) |
+| `create_saved_query` | Logs | Save a new query bound to a source |
+| `get_saved_query` | Logs | Get a saved query by ID |
+| `update_saved_query` | Logs | Update an existing saved query (creator-only) |
+| `delete_saved_query` | Logs | Delete a saved query (creator-only) |
 | `query_logchefql` | LogchefQL | Execute LogchefQL query (max 500 rows) |
 | `translate_logchefql` | LogchefQL | Translate LogchefQL to SQL |
 | `validate_logchefql` | LogchefQL | Validate LogchefQL syntax |

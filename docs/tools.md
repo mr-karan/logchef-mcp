@@ -30,15 +30,15 @@ Complete reference for all tools, resources, and prompts available in the Logche
 | `get_source_schema` | Get column names and ClickHouse types for a source |
 | `get_log_histogram` | Time-series histogram of log volume with optional grouping |
 
-### Saved Queries (Collections)
+### Saved Queries
 
 | Tool | Description |
 |------|-------------|
-| `get_collections` | List saved query collections for a team/source |
-| `get_collection` | Get a specific saved query by ID |
-| `create_collection` | Save a new query collection |
-| `update_collection` | Update an existing saved query |
-| `delete_collection` | Delete a saved query permanently |
+| `list_saved_queries` | List saved queries visible to the caller. Optionally filter by `source_id` |
+| `get_saved_query` | Get a single saved query by ID |
+| `create_saved_query` | Save a new query bound to a source |
+| `update_saved_query` | Update an existing saved query (creator-only) |
+| `delete_saved_query` | Delete a saved query permanently (creator-only) |
 
 ### Investigation
 
@@ -106,8 +106,8 @@ Resources provide read-only data that AI assistants can access without explicit 
 | URI Template | Description |
 |-------------|-------------|
 | `logchef://team/{team_id}/source/{source_id}/schema` | ClickHouse schema for a source |
-| `logchef://team/{team_id}/source/{source_id}/collections` | List of saved queries |
-| `logchef://team/{team_id}/source/{source_id}/collection/{collection_id}` | A single saved query |
+| `logchef://source/{source_id}/saved-queries` | List of saved queries pinned to a source |
+| `logchef://saved-query/{query_id}` | A single saved query |
 
 ---
 

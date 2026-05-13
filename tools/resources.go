@@ -26,26 +26,30 @@ func AddResourceTemplates(s *server.MCPServer) {
 		handleSourceSchemaResource,
 	)
 
-	// Collections list resource template
+	// Saved queries for a source (logchef v1.6.0+ — source-scoped, not
+	// team-scoped). The team_id segment is kept in the URI so callers can
+	// continue to use the same team-pivoted browsing UX, but is ignored
+	// when looking up the saved queries themselves.
 	s.AddResourceTemplate(
 		mcp.NewResourceTemplate(
-			"logchef://team/{team_id}/source/{source_id}/collections",
-			"Saved Query Collections",
-			mcp.WithTemplateDescription("List of saved query collections for a log source. Collections are reusable queries for common log analysis patterns."),
+			"logchef://source/{source_id}/saved-queries",
+			"Saved Queries",
+			mcp.WithTemplateDescription("Saved queries pinned to a log source. Each entry has a query_type (logchefql or sql), query_content (JSON envelope), and source metadata."),
 			mcp.WithTemplateMIMEType("application/json"),
 		),
-		handleCollectionsListResource,
+		handleSavedQueriesListResource,
 	)
 
-	// Single collection resource template
+	// Single saved query by ID. Saved queries are no longer scoped under a
+	// team/source path — the canonical lookup is by global query ID.
 	s.AddResourceTemplate(
 		mcp.NewResourceTemplate(
-			"logchef://team/{team_id}/source/{source_id}/collection/{collection_id}",
-			"Saved Query Collection",
-			mcp.WithTemplateDescription("A single saved query collection with its name, description, and ClickHouse SQL query."),
+			"logchef://saved-query/{query_id}",
+			"Saved Query",
+			mcp.WithTemplateDescription("A single saved query with its name, description, query_type, query_content, and source metadata."),
 			mcp.WithTemplateMIMEType("application/json"),
 		),
-		handleCollectionResource,
+		handleSavedQueryResource,
 	)
 }
 
@@ -75,8 +79,8 @@ func handleSourceSchemaResource(ctx context.Context, request mcp.ReadResourceReq
 	}, nil
 }
 
-func handleCollectionsListResource(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
-	teamID, sourceID, err := parseTeamSourceURI(request.Params.URI)
+func handleSavedQueriesListResource(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+	sourceID, err := parseSourceURI(request.Params.URI)
 	if err != nil {
 		return nil, err
 	}
@@ -86,12 +90,12 @@ func handleCollectionsListResource(ctx context.Context, request mcp.ReadResource
 		return nil, fmt.Errorf("logchef client not configured")
 	}
 
-	collections, err := c.GetCollections(ctx, teamID, sourceID)
+	queries, err := c.ListSavedQueries(ctx, sourceID)
 	if err != nil {
-		return nil, fmt.Errorf("get collections: %w", err)
+		return nil, fmt.Errorf("list saved queries: %w", err)
 	}
 
-	out, _ := json.MarshalIndent(collections.Data, "", "  ")
+	out, _ := json.MarshalIndent(queries.Data, "", "  ")
 	return []mcp.ResourceContents{
 		mcp.TextResourceContents{
 			URI:      request.Params.URI,
@@ -101,8 +105,8 @@ func handleCollectionsListResource(ctx context.Context, request mcp.ReadResource
 	}, nil
 }
 
-func handleCollectionResource(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
-	teamID, sourceID, collectionID, err := parseCollectionURI(request.Params.URI)
+func handleSavedQueryResource(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+	queryID, err := parseSavedQueryURI(request.Params.URI)
 	if err != nil {
 		return nil, err
 	}
@@ -112,12 +116,12 @@ func handleCollectionResource(ctx context.Context, request mcp.ReadResourceReque
 		return nil, fmt.Errorf("logchef client not configured")
 	}
 
-	collection, err := c.GetCollection(ctx, teamID, sourceID, collectionID)
+	got, err := c.GetSavedQuery(ctx, queryID)
 	if err != nil {
-		return nil, fmt.Errorf("get collection: %w", err)
+		return nil, fmt.Errorf("get saved query: %w", err)
 	}
 
-	out, _ := json.MarshalIndent(collection.Data, "", "  ")
+	out, _ := json.MarshalIndent(got.Data, "", "  ")
 	return []mcp.ResourceContents{
 		mcp.TextResourceContents{
 			URI:      request.Params.URI,
@@ -148,29 +152,34 @@ func parseTeamSourceURI(uri string) (int, int, error) {
 	return teamID, sourceID, nil
 }
 
-// parseCollectionURI extracts team_id, source_id, and collection_id from URIs like
-// logchef://team/{team_id}/source/{source_id}/collection/{collection_id}
-func parseCollectionURI(uri string) (int, int, int, error) {
+// parseSourceURI extracts source_id from URIs like
+// logchef://source/{source_id}/saved-queries
+func parseSourceURI(uri string) (int, error) {
 	parts := strings.Split(strings.TrimPrefix(uri, "logchef://"), "/")
-	// Expected: team/{id}/source/{id}/collection/{id}
-	if len(parts) < 6 || parts[0] != "team" || parts[2] != "source" || parts[4] != "collection" {
-		return 0, 0, 0, fmt.Errorf("invalid collection URI format: %s", uri)
+	if len(parts) < 2 || parts[0] != "source" {
+		return 0, fmt.Errorf("invalid source URI format: %s", uri)
 	}
 
-	teamID, err := strconv.Atoi(parts[1])
+	sourceID, err := strconv.Atoi(parts[1])
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("invalid team_id in URI: %s", parts[1])
+		return 0, fmt.Errorf("invalid source_id in URI: %s", parts[1])
 	}
 
-	sourceID, err := strconv.Atoi(parts[3])
+	return sourceID, nil
+}
+
+// parseSavedQueryURI extracts query_id from URIs like
+// logchef://saved-query/{query_id}
+func parseSavedQueryURI(uri string) (int, error) {
+	parts := strings.Split(strings.TrimPrefix(uri, "logchef://"), "/")
+	if len(parts) < 2 || parts[0] != "saved-query" {
+		return 0, fmt.Errorf("invalid saved-query URI format: %s", uri)
+	}
+
+	queryID, err := strconv.Atoi(parts[1])
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("invalid source_id in URI: %s", parts[3])
+		return 0, fmt.Errorf("invalid query_id in URI: %s", parts[1])
 	}
 
-	collectionID, err := strconv.Atoi(parts[5])
-	if err != nil {
-		return 0, 0, 0, fmt.Errorf("invalid collection_id in URI: %s", parts[5])
-	}
-
-	return teamID, sourceID, collectionID, nil
+	return queryID, nil
 }
