@@ -1,5 +1,27 @@
 # Logchef MCP Server
 
+> [!IMPORTANT]
+> **This repository is archived. MCP is now built into Logchef.**
+>
+> Logchef serves MCP at `https://<your-logchef>/mcp` from the same process.
+> Agents sign in with OAuth: you approve the connection in the browser after
+> your normal Logchef login. There is no sidecar to deploy and no API token to
+> paste into an agent.
+>
+> - Claude Code: `claude mcp add --transport http --client-id logchef-mcp logchef https://<your-logchef>/mcp`
+> - Codex: `codex mcp add logchef --url https://<your-logchef>/mcp --oauth-client-id logchef-mcp`
+> - Cursor, Claude.ai, ChatGPT and server setup: [Logchef agent setup](https://logchef.app/integration/agent-setup/) and [MCP server](https://logchef.app/integration/mcp-server/)
+>
+> The built-in server has the read tools from this project (profile, teams,
+> sources, schema, LogchefQL and SQL queries, histograms, field values, log
+> context, saved queries, alerts, `compare_windows`, `top_values`) and an
+> investigation panel. It does not include the admin and write tools or AI
+> query generation; use the Logchef web UI, API or CLI for those.
+>
+> Existing deployments of this server keep working with API tokens but receive
+> no further updates.
+
+
 A [Model Context Protocol][mcp] (MCP) server that connects AI assistants to your [Logchef](https://logchef.app) instance.
 
 Logchef is a powerful log management platform that stores logs in ClickHouse, providing fast querying and analysis capabilities. This MCP server enables AI assistants to interact with your Logchef deployment, making log analysis and troubleshooting more accessible through natural conversation.
